@@ -13,6 +13,8 @@ const HORIZON = 5 * 366 * 86400;
  * so the same 2-day constant covers both directions.
  */
 const LOOKBACK = 2 * 86400;
+/** Window width at which prev's descent stops halving and just walks (see collectLatest). */
+const LEAF = 3600;
 const DEFAULT_COUNT = 10;
 const MAX_COUNT = 1000;
 
@@ -124,6 +126,49 @@ function* guarded<T>(gen: Generator<T>): Generator<T> {
   }
 }
 
+/** The first item of a generator, or null. Closes the generator, so nothing past it is computed. */
+function firstOf<T>(gen: Generator<T>): T | null {
+  for (const item of gen) return item;
+  return null;
+}
+
+/** The last `need` items of a generator, in order, holding no more than `need` of them at a time. */
+function lastFew<T>(gen: Generator<T>, need: number): T[] {
+  const ring: T[] = [];
+  let at = 0;
+  let seen = 0;
+  for (const item of gen) {
+    if (ring.length < need) ring.push(item);
+    else ring[at] = item;
+    at = (at + 1) % need;
+    seen += 1;
+  }
+  return seen <= need ? ring : [...ring.slice(at), ...ring.slice(0, at)];
+}
+
+/**
+ * The last `need` runs in [start, end], ascending. Descends newest half first and stops as soon as the
+ * halves seen so far cover `need`, so neither time nor memory grows with the width of the window: an
+ * empty half costs one lazy peek, and only leaves that actually contribute are enumerated.
+ *
+ * Two facts make halving sound. walk() is window-independent - it looks a fixed distance either side of
+ * its window for the transitions that classify a run - so a half yields exactly the runs of that half.
+ * And windows are split by instant, so runs sharing an instant (a catch-up and the natural run behind it)
+ * always land in the same half and are never counted apart.
+ */
+function collectLatest(
+  runs: (start: number, end: number) => Generator<RawRun>, start: number, end: number, need: number,
+): RawRun[] {
+  if (start > end || need <= 0) return [];
+  if (end - start + 1 <= LEAF) return lastFew(runs(start, end), need);
+  if (firstOf(runs(start, end)) === null) return [];
+
+  const mid = start + Math.floor((end - start) / 2);
+  const newer = collectLatest(runs, mid + 1, end, need);
+  if (newer.length >= need) return newer;
+  return [...collectLatest(runs, start, mid, need - newer.length), ...newer];
+}
+
 function toRun(r: RawRun): Run {
   const run: Run = { at: new Date(r.at * 1000), local: formatLocal(r.wall, r.offset) };
   if (r.dst) run.dst = r.dst;
@@ -196,13 +241,9 @@ export function createEngine(
       floor = Math.max(floor, Math.ceil(untilMs / 1000));
     }
 
-    // The same forward walk over windows that grow backwards, so prev agrees with next by construction.
-    const count = clampCount(opts.count);
-    for (let span = 3600; ; span *= 4) {
-      const start = Math.max(floor, end - span + 1);
-      const runs = [...guarded(walk(p.c, p.spec, tz, p.zone, start, end))];
-      if (runs.length >= count || start === floor) return runs.slice(-count).reverse().map(toRun);
-    }
+    // The same forward walk, over halves of [floor, end], so prev agrees with next by construction.
+    const runs = (a: number, b: number) => guarded(walk(p.c, p.spec, tz, p.zone, a, b));
+    return collectLatest(runs, floor, end, clampCount(opts.count)).reverse().map(toRun);
   }
 
   function matches(s: Schedule | string, at: Date): boolean {

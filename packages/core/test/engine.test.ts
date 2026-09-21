@@ -127,6 +127,23 @@ describe('prev', () => {
     expect(isos(runs)).toEqual(['2026-09-21T03:00:00.000Z', '2026-09-21T02:00:00.000Z']);
   });
 
+  // Both schedules are valid and both used to be collected whole before slicing: gigabytes and
+  // tens of seconds for what is three objects. The bound is wall clock, but the budget it guards
+  // is memory, so it is set far above any plausible machine variation.
+  it('finds the newest runs of a dense year-restricted schedule without collecting the window', () => {
+    const started = Date.now();
+    const runs = core.prev(sched('* * * * * ? 2022', 'quartz'), { from: at('2026-09-21T00:00:00Z'), count: 3 });
+    expect(isos(runs)).toEqual(['2022-12-31T23:59:59.000Z', '2022-12-31T23:59:58.000Z', '2022-12-31T23:59:57.000Z']);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it('finds the newest runs of a dense month-restricted schedule without collecting the window', () => {
+    const started = Date.now();
+    const runs = core.prev(sched('* * * * 1 ?', 'quartz'), { from: at('2026-09-21T00:00:00Z'), count: 2 });
+    expect(isos(runs)).toEqual(['2026-01-31T23:59:59.000Z', '2026-01-31T23:59:58.000Z']);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
   it('carries the same DST tags as next', () => {
     const runs = core.prev(sched('*/30 * * * *', 'vixie', 'Test/NY'), { from: at('2026-11-01T07:00:00Z'), count: 4 });
     expect(isos(runs)).toEqual(['2026-11-01T06:30:00.000Z', '2026-11-01T06:00:00.000Z', '2026-11-01T05:30:00.000Z', '2026-11-01T05:00:00.000Z']);
