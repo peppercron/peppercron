@@ -24,7 +24,7 @@ export interface Compiled {
   hours: number[];
   months: number[];
   years: number[] | null;
-  /** H1: neither the minute nor the hour field begins with '*'. */
+  /** Neither field is a star under the dialect's `star` strategy (H1: `leading`, K10: `unstepped-term`). */
   fixedTime: boolean;
   dayMatches(y: number, m: number, d: number): boolean;
 }

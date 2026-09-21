@@ -427,4 +427,21 @@ describe('never throws', () => {
       { numRuns: 500 },
     );
   });
+
+  // C1: parse used to throw on a non-string input (e.g. null from an absent URLSearchParams field);
+  // the property above only ever generates strings, which is why that regression went uncaught.
+  it('parse, next, prev and matches accept any non-string value as a schedule', () => {
+    fc.assert(
+      fc.property(fc.anything(), (input) => {
+        expect(() => {
+          const s = input as unknown as string;
+          parse(s);
+          next(s, { count: 2 });
+          prev(s, { count: 2 });
+          matches(s, new Date(0));
+        }).not.toThrow();
+      }),
+      { numRuns: 500 },
+    );
+  });
 });

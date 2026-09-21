@@ -101,3 +101,23 @@ describe('parse: claimed forms (Review Focus 1 and 4)', () => {
     }
   });
 });
+
+describe('parse: non-string input never throws (C1)', () => {
+  it('reports empty rather than throwing, for null, undefined, a number, an object or an array', () => {
+    for (const v of [null, undefined, 5, {}, ['0 9 * * *']]) {
+      expect(() => parse(v as unknown as string), String(v)).not.toThrow();
+      expect(parse(v as unknown as string)).toEqual({
+        ok: false, error: { code: 'empty', message: 'The expression is not a string', span: [0, 0] },
+      });
+    }
+  });
+
+  it('guards ahead of a valid dialect option and a null opts', () => {
+    expect(parse(null as unknown as string, { dialect: 'vixie' })).toEqual({
+      ok: false, error: { code: 'empty', message: 'The expression is not a string', span: [0, 0] },
+    });
+    expect(parse(undefined as unknown as string, null)).toEqual({
+      ok: false, error: { code: 'empty', message: 'The expression is not a string', span: [0, 0] },
+    });
+  });
+});

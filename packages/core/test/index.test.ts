@@ -31,4 +31,17 @@ describe('public entry point', () => {
     expect(prev(zoneless, { from })).toEqual([]);
     expect(matches(zoneless, new Date('2026-09-21T02:00:00Z'))).toBe(false);
   });
+
+  it('never throws for a non-string schedule (C1)', () => {
+    const from = new Date('2026-09-21T00:00:00Z');
+    for (const v of [null, undefined, 5, {}, ['0 9 * * *']]) {
+      const s = v as unknown as string;
+      expect(() => next(s, { from }), String(v)).not.toThrow();
+      expect(() => prev(s, { from }), String(v)).not.toThrow();
+      expect(() => matches(s, from), String(v)).not.toThrow();
+      expect(next(s, { from })).toEqual([]);
+      expect(prev(s, { from })).toEqual([]);
+      expect(matches(s, from)).toBe(false);
+    }
+  });
 });

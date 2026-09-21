@@ -103,6 +103,7 @@ function detect(source: string, timezone: string): Result<Schedule, ParseError> 
 
 export function createParser(tz: Tz) {
   return function parse(input: string, opts?: ParseOptions | null): Result<Schedule, ParseError> {
+    if (typeof input !== 'string') return fail('empty', 'The expression is not a string', [0, 0]);
     const o = opts ?? {};
     const tokens = tokenize(input);
     if (tokens.length === 0) return fail('empty', 'The expression is empty', [0, input.length]);
