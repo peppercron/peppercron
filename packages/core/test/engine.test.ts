@@ -319,3 +319,81 @@ describe('aws DST (DERIVATION A14, A15)', () => {
     expect(core.matches(s, at('2026-11-01T06:30:00Z'))).toBe(false);
   });
 });
+
+describe('interval schedules', () => {
+  const anchor = at('2026-09-21T10:00:00Z');
+
+  it('kubernetes: the first run is one interval after the anchor (DERIVATION K7)', () => {
+    const runs = core.next('@every 1h30m', { anchor, from: at('2026-09-21T08:00:00Z'), count: 3 });
+    expect(isos(runs)).toEqual(['2026-09-21T11:30:00.000Z', '2026-09-21T13:00:00.000Z', '2026-09-21T14:30:00.000Z']);
+    expect(runs[0]).toEqual({ at: at('2026-09-21T11:30:00Z'), local: '2026-09-21T11:30:00+00:00' });
+  });
+
+  it('aws: the first run is the anchor itself', () => {
+    const s = 'rate(5 minutes)';
+    expect(isos(core.next(s, { anchor, from: at('2026-09-21T09:00:00Z'), count: 2 }))).toEqual(['2026-09-21T10:00:00.000Z', '2026-09-21T10:05:00.000Z']);
+    expect(isos(core.next(s, { anchor, from: anchor, count: 1 }))).toEqual(['2026-09-21T10:05:00.000Z']);
+    expect(isos(core.next(s, { anchor, from: anchor, count: 1, inclusive: true }))).toEqual(['2026-09-21T10:00:00.000Z']);
+  });
+
+  it('defaults the anchor to from', () => {
+    expect(isos(core.next('@every 5m', { from: anchor, count: 2 }))).toEqual(['2026-09-21T10:05:00.000Z', '2026-09-21T10:10:00.000Z']);
+    expect(isos(core.next('rate(5 minutes)', { from: anchor, count: 2 }))).toEqual(['2026-09-21T10:05:00.000Z', '2026-09-21T10:10:00.000Z']);
+  });
+
+  it('floors an anchor with milliseconds to its second, as robfig does', () => {
+    const runs = core.next('@every 90s', { anchor: at('2026-09-21T10:00:00.750Z'), from: anchor, count: 2 });
+    expect(isos(runs)).toEqual(['2026-09-21T10:01:30.000Z', '2026-09-21T10:03:00.000Z']);
+  });
+
+  it('reports local time in the schedule zone and never a dst tag', () => {
+    const s = sched('rate(1 day)', 'aws', 'Test/NY');
+    const runs = core.next(s, { anchor: at('2026-03-07T17:00:00Z'), from: at('2026-03-07T17:00:00Z'), count: 2 });
+    expect(runs).toEqual([
+      { at: at('2026-03-08T17:00:00Z'), local: '2026-03-08T13:00:00-04:00' },
+      { at: at('2026-03-09T17:00:00Z'), local: '2026-03-09T13:00:00-04:00' },
+    ]);
+  });
+
+  it('prev walks back to the anchor and no further', () => {
+    const back = core.prev('@every 1h', { anchor, from: at('2026-09-21T12:30:00Z'), count: 5 });
+    expect(isos(back)).toEqual(['2026-09-21T12:00:00.000Z', '2026-09-21T11:00:00.000Z']);
+    expect(core.prev('@every 1h', { from: at('2026-09-21T12:30:00Z') })).toEqual([]);
+  });
+
+  it('matches needs an anchor', () => {
+    expect(core.matches('@every 1h', at('2026-09-21T11:00:00Z'), { anchor })).toBe(true);
+    expect(core.matches('@every 1h', at('2026-09-21T11:00:01Z'), { anchor })).toBe(false);
+    expect(core.matches('@every 1h', at('2026-09-21T10:00:00Z'), { anchor })).toBe(false);
+    expect(core.matches('rate(1 hour)', at('2026-09-21T10:00:00Z'), { anchor })).toBe(true);
+    expect(core.matches('@every 1h', at('2026-09-21T11:00:00Z'))).toBe(false);
+    expect(core.matches('@every 1h', at('2026-09-21T11:00:00Z'), null)).toBe(false);
+  });
+
+  it('ignores anchor for a calendar schedule', () => {
+    const runs = core.next('0 2 * * 1', { anchor, from: at('2026-09-21T00:00:00Z'), count: 1 });
+    expect(isos(runs)).toEqual(['2026-09-21T02:00:00.000Z']);
+  });
+
+  it('returns nothing for an unusable anchor (Review Focus 3)', () => {
+    for (const bad of [new Date(Number.NaN), 'yesterday', 12345, {}]) {
+      const opts = { anchor: bad as unknown as Date, from: anchor, count: 2 };
+      expect(core.next('@every 1h', opts)).toEqual([]);
+      expect(core.prev('@every 1h', opts)).toEqual([]);
+      expect(core.matches('@every 1h', anchor, { anchor: bad as unknown as Date })).toBe(false);
+    }
+  });
+
+  it('returns nothing for a hand-built schedule with a malformed interval (Review Focus 5)', () => {
+    const good = sched('@every 1h', 'kubernetes');
+    for (const interval of [null, {}, { seconds: 0 }, { seconds: -5 }, { seconds: 1.5 }, { seconds: Number.NaN }, { seconds: '60' }]) {
+      const s = { ...good, interval } as unknown as Schedule;
+      expect(() => core.next(s, { anchor, from: anchor })).not.toThrow();
+      expect(core.next(s, { anchor, from: anchor })).toEqual([]);
+      expect(core.prev(s, { anchor, from: at('2026-09-22T00:00:00Z') })).toEqual([]);
+      expect(core.matches(s, at('2026-09-21T11:00:00Z'), { anchor })).toBe(false);
+    }
+    const wrongDialect = { ...good, dialect: 'vixie' } as Schedule;
+    expect(core.next(wrongDialect, { anchor, from: anchor })).toEqual([]);
+  });
+});

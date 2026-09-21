@@ -80,6 +80,17 @@ export interface RunOptions {
   count?: number;
   until?: Date;
   inclusive?: boolean;
+  /**
+   * When an interval schedule (`@every`, `rate(...)`) was created or started; its runs are
+   * `anchor + k * interval`. Floored to a whole second. Defaults to `from`, which answers "if this were
+   * created now, when would it fire". Calendar schedules ignore it.
+   */
+  anchor?: Date;
+}
+
+export interface MatchOptions {
+  /** Required for an interval schedule: without it `matches` is false, because no run is known. */
+  anchor?: Date;
 }
 
 export type DstTag = 'skipped-adjusted' | 'ambiguous-first' | 'ambiguous-second';

@@ -1,0 +1,46 @@
+[
+  { "id": "kubernetes-every-first-run-is-one-interval-after-the-anchor", "dialect": "kubernetes", "input": "@every 1h30m", "timezone": "UTC",
+    "anchor": "2026-09-21T10:00:00Z", "from": "2026-09-21T08:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-09-21T11:30:00Z", "local": "2026-09-21T11:30:00+00:00" },
+      { "at": "2026-09-21T13:00:00Z", "local": "2026-09-21T13:00:00+00:00" },
+      { "at": "2026-09-21T14:30:00Z", "local": "2026-09-21T14:30:00+00:00" }
+    ],
+    "notMatching": ["2026-09-21T10:00:00Z"],
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md K7" } },
+  { "id": "kubernetes-every-anchor-defaults-to-from", "dialect": "kubernetes", "input": "@every 5m", "timezone": "UTC",
+    "from": "2026-09-21T10:00:00Z", "count": 2,
+    "expect": [
+      { "at": "2026-09-21T10:05:00Z", "local": "2026-09-21T10:05:00+00:00" },
+      { "at": "2026-09-21T10:10:00Z", "local": "2026-09-21T10:10:00+00:00" }
+    ],
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md K7" } },
+  { "id": "kubernetes-every-ignores-the-time-zone", "dialect": "kubernetes", "input": "@every 24h", "timezone": "America/New_York",
+    "anchor": "2026-03-08T04:00:00Z", "from": "2026-03-08T04:00:00Z", "count": 2,
+    "expect": [
+      { "at": "2026-03-09T04:00:00Z", "local": "2026-03-09T00:00:00-04:00" },
+      { "at": "2026-03-10T04:00:00Z", "local": "2026-03-10T00:00:00-04:00" }
+    ],
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md K7" } },
+  { "id": "aws-rate-first-run-is-the-anchor", "dialect": "aws", "input": "rate(5 minutes)", "timezone": "UTC",
+    "anchor": "2026-09-21T10:00:00Z", "from": "2026-09-21T08:00:00Z", "count": 2,
+    "expect": [
+      { "at": "2026-09-21T10:00:00Z", "local": "2026-09-21T10:00:00+00:00" },
+      { "at": "2026-09-21T10:05:00Z", "local": "2026-09-21T10:05:00+00:00" }
+    ],
+    "provenance": { "kind": "assumed", "source": "corpus/DERIVATION.md A10" } },
+  { "id": "aws-rate-one-day-is-24-hours-across-dst", "dialect": "aws", "input": "rate(1 day)", "timezone": "America/New_York",
+    "anchor": "2026-03-07T17:00:00Z", "from": "2026-03-07T17:00:00Z", "count": 2,
+    "expect": [
+      { "at": "2026-03-08T17:00:00Z", "local": "2026-03-08T13:00:00-04:00" },
+      { "at": "2026-03-09T17:00:00Z", "local": "2026-03-09T13:00:00-04:00" }
+    ],
+    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md A11" } },
+  { "id": "aws-rate-far-from-its-anchor", "dialect": "aws", "input": "rate(1 minute)", "timezone": "UTC",
+    "anchor": "2021-01-01T00:00:00Z", "from": "2026-09-21T00:00:30Z", "count": 2,
+    "expect": [
+      { "at": "2026-09-21T00:01:00Z", "local": "2026-09-21T00:01:00+00:00" },
+      { "at": "2026-09-21T00:02:00Z", "local": "2026-09-21T00:02:00+00:00" }
+    ],
+    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md A9" } }
+]

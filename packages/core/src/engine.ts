@@ -1,8 +1,9 @@
 import { formatLocal, formatWall } from './calendar';
 import { getDialect, type DialectSpec } from './dialects';
+import { intervalRuns } from './interval-runs';
 import { compile, nextWallMatch, type Compiled } from './matcher';
 import type {
-  DstTag, ParseError, ParseOptions, Result, Run, RunOptions, Schedule, Transition, Tz,
+  DstTag, MatchOptions, ParseError, ParseOptions, Result, Run, RunOptions, Schedule, Transition, Tz,
 } from './types';
 
 const HORIZON = 5 * 366 * 86400;
@@ -212,7 +213,11 @@ export function createEngine(
   tz: Tz,
   parse: (input: string, opts?: ParseOptions) => Result<Schedule, ParseError>,
 ) {
-  function prepare(s: Schedule | string) {
+  type Prepared =
+    | { kind: 'calendar'; c: Compiled; spec: DialectSpec; zone: string }
+    | { kind: 'interval'; seconds: number; firstK: 0 | 1; zone: string };
+
+  function prepare(s: Schedule | string): Prepared | null {
     try {
       let schedule: Schedule | null = null;
       if (typeof s === 'string') {
@@ -223,17 +228,41 @@ export function createEngine(
       }
       if (!schedule || !Array.isArray(schedule.fields) || !tz.isValid(schedule.timezone)) return null;
       const spec = getDialect(schedule.dialect);
-      const c = spec ? compile(schedule, spec) : null;
-      return spec && c ? { c, spec, zone: schedule.timezone } : null;
+      if (!spec) return null;
+      const zone = schedule.timezone;
+      if (schedule.interval !== undefined) {
+        const seconds = schedule.interval.seconds;
+        if (spec.interval === 'none' || !Number.isSafeInteger(seconds) || seconds < 1) return null;
+        return { kind: 'interval', seconds, firstK: spec.intervalFirst === 'at-anchor' ? 0 : 1, zone };
+      }
+      const c = compile(schedule, spec);
+      return c ? { kind: 'calendar', c, spec, zone } : null;
     } catch {
       return null;
+    }
+  }
+
+  /** Interval runs in [start, end]. An unusable anchor, or a provider that throws, means no runs. */
+  function everyRuns(
+    p: Extract<Prepared, { kind: 'interval' }>, anchor: unknown, start: number, end: number, count: number, fromEnd: boolean,
+  ): Run[] {
+    const anchorMs = toMs(anchor);
+    if (Number.isNaN(anchorMs)) return [];
+    try {
+      return intervalRuns(p.seconds, p.firstK, Math.floor(anchorMs / 1000), start, end, count, fromEnd).map((at) => {
+        const offset = tz.offsetAt(p.zone, at);
+        return { at: new Date(at * 1000), local: formatLocal(at + offset, offset) };
+      });
+    } catch {
+      return [];
     }
   }
 
   function next(s: Schedule | string, opts?: RunOptions | null): Run[] {
     const o = opts ?? {};
     const p = prepare(s);
-    const fromMs = toMs(o.from ?? new Date());
+    const fromDate = o.from ?? new Date();
+    const fromMs = toMs(fromDate);
     if (!p || Number.isNaN(fromMs)) return [];
 
     const sec = Math.floor(fromMs / 1000);
@@ -248,6 +277,7 @@ export function createEngine(
     end = Math.min(end, MAX_DATE_SEC);
 
     const count = clampCount(o.count);
+    if (p.kind === 'interval') return everyRuns(p, o.anchor ?? fromDate, start, end, count, false);
     const out: Run[] = [];
     for (const r of guarded(walk(p.c, p.spec, tz, p.zone, start, end))) {
       out.push(toRun(r));
@@ -259,7 +289,8 @@ export function createEngine(
   function prev(s: Schedule | string, opts?: RunOptions | null): Run[] {
     const o = opts ?? {};
     const p = prepare(s);
-    const fromMs = toMs(o.from ?? new Date());
+    const fromDate = o.from ?? new Date();
+    const fromMs = toMs(fromDate);
     if (!p || Number.isNaN(fromMs)) return [];
 
     const sec = Math.floor(fromMs / 1000);
@@ -274,16 +305,22 @@ export function createEngine(
     end = Math.min(end, MAX_DATE_SEC);
     floor = Math.max(floor, -MAX_DATE_SEC);
 
+    if (p.kind === 'interval') return everyRuns(p, o.anchor ?? fromDate, floor, end, clampCount(o.count), true).reverse();
+
     // The same forward walk, over halves of [floor, end], so prev agrees with next by construction.
     const runs = (a: number, b: number) => guarded(walk(p.c, p.spec, tz, p.zone, a, b));
     return collectLatest(runs, floor, end, clampCount(o.count)).reverse().map(toRun);
   }
 
-  function matches(s: Schedule | string, at: Date): boolean {
+  function matches(s: Schedule | string, at: Date, opts?: MatchOptions | null): boolean {
     const p = prepare(s);
     const ms = toMs(at);
     if (!p || Number.isNaN(ms) || ms % 1000 !== 0) return false;
     const sec = ms / 1000;
+    if (p.kind === 'interval') {
+      const anchor = (opts ?? {}).anchor;
+      return anchor !== undefined && everyRuns(p, anchor, sec, sec, 1, false).length === 1;
+    }
     for (const r of guarded(walk(p.c, p.spec, tz, p.zone, sec, sec))) return r.at === sec;
     return false;
   }

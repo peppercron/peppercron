@@ -15,6 +15,7 @@ interface NextCase {
   timezone: string;
   from: string;
   until?: string;
+  anchor?: string;
   count: number;
   expect: Expected[];
   notMatching?: string[];
@@ -47,27 +48,31 @@ for (const file of readdirSync(join(CORPUS, 'cases', 'next')).filter((f) => f.en
       if (!parsed.ok) return;
       const s = parsed.value;
 
-      const opts = { from: new Date(c.from), count: c.count, ...(c.until ? { until: new Date(c.until) } : {}) };
+      const anchored = c.anchor ? { anchor: new Date(c.anchor) } : {};
+      const opts = { from: new Date(c.from), count: c.count, ...(c.until ? { until: new Date(c.until) } : {}), ...anchored };
       expect(next(s, opts).map(shape)).toEqual(c.expect);
 
+      // The derived checks always name the anchor: matches() has no `from` to default it to.
+      const derived = { anchor: new Date(c.anchor ?? c.from) };
       for (const instant of c.notMatching ?? []) {
-        expect(matches(s, new Date(instant)), `${instant} must not match`).toBe(false);
+        expect(matches(s, new Date(instant), derived), `${instant} must not match`).toBe(false);
       }
       if (c.skipDerived || c.expect.length === 0) return;
 
-      const unit = getDialect(c.dialect)!.fields.some((f) => f.name === 'second') ? 1000 : 60000;
+      const bySecond = s.interval !== undefined || getDialect(c.dialect)!.fields.some((f) => f.name === 'second');
+      const unit = bySecond ? 1000 : 60000;
       let floor = new Date(c.from).getTime();
       for (const e of c.expect) {
         const at = new Date(e.at).getTime();
-        expect(matches(s, new Date(at)), `${e.at} must match`).toBe(true);
+        expect(matches(s, new Date(at), derived), `${e.at} must match`).toBe(true);
         if (at - unit > floor) {
-          expect(matches(s, new Date(at - unit)), `one unit before ${e.at} must not match`).toBe(false);
+          expect(matches(s, new Date(at - unit), derived), `one unit before ${e.at} must not match`).toBe(false);
         }
         floor = at;
       }
 
       const last = new Date(c.expect[c.expect.length - 1].at).getTime();
-      const back = prev(s, { from: new Date(last + 1000), count: c.expect.length });
+      const back = prev(s, { from: new Date(last + 1000), count: c.expect.length, ...derived });
       expect(back.map(shape)).toEqual([...c.expect].reverse());
     });
   });

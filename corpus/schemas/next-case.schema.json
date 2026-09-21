@@ -12,6 +12,7 @@
       "timezone": { "description": "IANA zone name the schedule runs in.", "type": "string" },
       "from": { "description": "RunOptions.from, exclusive: a run exactly at `from` is not returned, since no case sets `inclusive`.", "$ref": "#/definitions/instant" },
       "until": { "description": "RunOptions.until, inclusive: a run exactly at `until` is returned.", "$ref": "#/definitions/instant" },
+      "anchor": { "description": "RunOptions.anchor for an interval schedule. When absent, next() is called without one, so the anchor defaults to `from`; the derived checks then pass `from` as the anchor explicitly.", "$ref": "#/definitions/instant" },
       "count": { "description": "RunOptions.count. `expect` may hold fewer runs than this (the schedule ran out, or until/the horizon cut it off), never more.", "type": "integer", "minimum": 1, "maximum": 1000 },
       "expect": {
         "description": "Exactly what next(schedule, {from, count, until}) returns, in order. Instants are non-decreasing; equal instants occur only in a group that begins with skipped-adjusted runs.",
