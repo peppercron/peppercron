@@ -6,21 +6,22 @@
     "additionalProperties": false,
     "required": ["id", "dialect", "input", "timezone", "from", "count", "expect", "provenance"],
     "properties": {
-      "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-      "dialect": { "type": "string" },
-      "input": { "type": "string" },
-      "timezone": { "type": "string" },
-      "from": { "$ref": "#/definitions/instant" },
-      "until": { "$ref": "#/definitions/instant" },
-      "count": { "type": "integer", "minimum": 1, "maximum": 1000 },
+      "id": { "description": "Unique within the corpus; a runner reports failures by it.", "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "dialect": { "description": "Id of the dialect to parse `input` with. Always explicit here: detection is a parse-case concern.", "type": "string" },
+      "input": { "description": "The expression exactly as a user would type it.", "type": "string" },
+      "timezone": { "description": "IANA zone name the schedule runs in.", "type": "string" },
+      "from": { "description": "RunOptions.from, exclusive: a run exactly at `from` is not returned, since no case sets `inclusive`.", "$ref": "#/definitions/instant" },
+      "until": { "description": "RunOptions.until, inclusive: a run exactly at `until` is returned.", "$ref": "#/definitions/instant" },
+      "count": { "description": "RunOptions.count. `expect` may hold fewer runs than this (the schedule ran out, or until/the horizon cut it off), never more.", "type": "integer", "minimum": 1, "maximum": 1000 },
       "expect": {
+        "description": "Exactly what next(schedule, {from, count, until}) returns, in order. Instants are non-decreasing; equal instants occur only in a group that begins with skipped-adjusted runs.",
         "type": "array",
         "items": {
           "type": "object",
           "additionalProperties": false,
           "required": ["at", "local"],
           "properties": {
-            "at": { "$ref": "#/definitions/instant" },
+            "at": { "description": "The instant the run fires.", "$ref": "#/definitions/instant" },
             "local": {
               "description": "Run.local: the run's wall time in the schedule timezone with its UTC offset. The seconds of the offset appear only when it has any (historical LMT offsets).",
               "type": "string",
@@ -38,9 +39,10 @@
           }
         }
       },
-      "notMatching": { "type": "array", "items": { "$ref": "#/definitions/instant" } },
-      "skipDerived": { "type": "boolean" },
+      "notMatching": { "description": "Instants a runner must assert matches() is false for: the cases where a plain wall-clock field test would say true but the dialect's DST strategy does not emit the run.", "type": "array", "items": { "$ref": "#/definitions/instant" } },
+      "skipDerived": { "description": "Suppresses the derived matches() and prev() checks (see corpus/README.md). For a case whose `expect` is deliberately a partial view of its window.", "type": "boolean" },
       "provenance": {
+        "description": "Where the expected values come from. `spec` = the dialect specification or documented behaviour; `derived` = read from reference source, with `source` citing the section; `captured` = recorded from a running reference implementation, with `platform` and `recording`.",
         "type": "object",
         "required": ["kind"],
         "properties": {
@@ -57,6 +59,6 @@
     }
   },
   "definitions": {
-    "instant": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" }
+    "instant": { "description": "An absolute instant, always UTC and always whole seconds.", "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" }
   }
 }

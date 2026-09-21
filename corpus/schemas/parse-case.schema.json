@@ -7,24 +7,27 @@
     "required": ["id", "input", "provenance"],
     "oneOf": [{ "required": ["expect"] }, { "required": ["expectError"] }],
     "properties": {
-      "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-      "input": { "type": "string" },
+      "id": { "description": "Unique within the corpus; a runner reports failures by it.", "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "input": { "description": "The expression exactly as a user would type it. It is never trimmed or normalised before parsing, and spans index into it.", "type": "string" },
       "options": {
+        "description": "ParseOptions. Omitting `dialect` exercises dialect detection; omitting `timezone` means UTC.",
         "type": "object",
         "additionalProperties": false,
         "properties": { "dialect": { "type": "string" }, "timezone": { "type": "string" } }
       },
       "expect": {
+        "description": "The whole Schedule the parse returns, compared in full: every field with its raw, span, terms, values and star, plus the optional macro, trailing and candidates. An optional key absent here must be absent there.",
         "type": "object",
         "required": ["dialect", "source", "timezone", "fields"]
       },
       "expectError": {
+        "description": "The ParseError the parse returns instead. Parsing never throws and never returns a partial schedule.",
         "type": "object",
         "additionalProperties": false,
         "required": ["code", "span"],
         "properties": {
-          "code": { "enum": ["empty", "field-count", "bad-token", "out-of-range", "bad-step", "bad-range", "unknown-macro", "unknown-dialect", "bad-timezone"] },
-          "span": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }
+          "code": { "description": "Closed list. A code means no Term could be built; a token this dialect merely does not support is not an error (see tokens in dialect.schema.json).", "enum": ["empty", "field-count", "bad-token", "out-of-range", "bad-step", "bad-range", "unknown-macro", "unknown-dialect", "bad-timezone"] },
+          "span": { "description": "[start, end) character offsets into `input`, as UTF-16 code units. A port whose strings are bytes or code points must convert.", "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }
         }
       },
       "provenance": { "$ref": "#/definitions/provenance" }
@@ -32,6 +35,7 @@
   },
   "definitions": {
     "provenance": {
+      "description": "Where the expected values come from. `spec` = the dialect specification or documented behaviour; `derived` = read from reference source, with `source` citing the section; `captured` = recorded from a running reference implementation, with `platform` and `recording`.",
       "type": "object",
       "required": ["kind"],
       "properties": {
