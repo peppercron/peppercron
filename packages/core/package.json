@@ -28,7 +28,11 @@
     "pretest": "npm run gen",
     "test": "vitest run",
     "pretypecheck": "npm run gen",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prebuild": "npm run gen",
+    "build": "tsup",
+    "postbuild": "tsc --project tsconfig.build.json && node -e \"require('fs').copyFileSync('dist/index.d.ts','dist/index.d.cts')\"",
+    "size": "node scripts/size.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
