@@ -12,14 +12,19 @@ behaviour lands as a case first.
 
 ```
 corpus/
-  DERIVATION.md              how each dialect behaviour was read out of cronie / Quartz source (H1..H8)
+  DERIVATION.md              how each dialect behaviour was read out of cronie / Quartz source (H1..H8),
+                              robfig/cron v3 as pinned by Kubernetes (K1..K16), GitHub Actions'
+                              documentation (G1..G11) and AWS EventBridge's documentation (A1..A17)
   README.md                  this file
   strategies.json            the closed list of strategy ids, per axis
   dialects/index.json        dialect ids, in dialect-detection order
   dialects/<id>.json         one dialect's data; <id> must equal the filename and appear in index.json
+                              (vixie, kubernetes, github-actions, quartz, aws)
   schemas/*.schema.json      JSON Schema (draft-07) for every file shape above and for the case files
   cases/parse/*.json         parse cases: expression in, Schedule or ParseError out
+                              (basic, errors, detection, kubernetes, github-actions, aws, intervals)
   cases/next/*.json          run-time cases: schedule plus a window in, Run list out
+                              (basic, dst, kubernetes, github-actions, aws, intervals)
 ```
 
 Case files are grouped by subject, not by dialect; the filenames carry no meaning beyond that. A
@@ -56,12 +61,16 @@ minute. This is the unit a runner steps by in the derived checks below.
 | `fields` | array, 5 or more | The dialect's fields **in the order they are written**. |
 | `macros` | `@name` to expansion | The expansion is a field string parsed as if typed (`"@daily": "0 0 * * *"`), or `null` for a macro that carries no schedule (`"@reboot": null`). Keys match `^@[a-z]+$` and are matched case-sensitively. |
 | `trailingCommand` | boolean | True: tokens past the last field become `Schedule.trailing` instead of a `field-count` error (a crontab line). False: extra tokens are an error. |
+| `wrapper` | a lowercase word, or `null` | A keyword the expression may be written inside, as in `cron(...)` (AWS) - the bare fields still parse too. `null` means this dialect has no wrapper. Matched **case-sensitively**: `CRON(...)` does not count as wrapped. See Forms below. |
 | `rangeWrap` | `error` \| `empty` \| `wrap` | What `from > to` in a range means: a `bad-range` error; an empty set; or wrapping across the field's end. |
 | `singleStep` | `error` \| `to-max` | What a step after a single value (`5/15`) means: a `bad-step` error (cronie), or "5 through the field maximum, every 15" (Quartz, FreeBSD). |
+| `star` | a `star` strategy id | When a field counts as a star, for the `domDow` rule and for the engine's fixed-time test. |
+| `interval` | an `interval` strategy id | How this dialect spells "every N seconds from an anchor" (`@every`, `rate(...)`), or `none` for a dialect with no such form. See Forms below. |
+| `intervalFirst` | `after-anchor` \| `at-anchor` | Which run is the first: `after-anchor` = the anchor plus one interval (Kubernetes); `at-anchor` = the anchor instant itself (AWS). Required unless `interval` is `none`. |
 | `domDow` | a `domDow` strategy id | How the day-of-month and day-of-week fields combine. |
 | `dstGap` | a `dstGap` strategy id | What happens to a run whose wall time a spring-forward skipped. |
 | `dstOverlap` | a `dstOverlap` strategy id | What happens to a run whose wall time a fall-back repeated. |
-| `missedRuns` | `none` \| `misfire-policy` | Recorded for later work; the engine does not read it. |
+| `missedRuns` | `none` \| `misfire-policy` \| `starting-deadline` \| `best-effort` \| `flexible-window` | What the reference implementation does about a run missed while it was not running/watching: nothing special (vixie); Quartz's configurable misfire policy; Kubernetes CronJob's `startingDeadlineSeconds`, past which a missed run is skipped rather than started late; GitHub Actions' best-effort delivery, which can silently drop a run under high load (DERIVATION G7); EventBridge Scheduler's flexible time window, which may delay a run within a configured window. Recorded for later work; the engine does not read it. |
 | `defaultTimezone` | `host` \| `utc` | What the *reference implementation* assumes when its user names no zone. It is a fact about the dialect, not about this library: `parse` here defaults to `UTC` and a `Schedule` always carries an explicit zone. |
 
 Each entry of `fields`:
@@ -72,7 +81,7 @@ Each entry of `fields`:
 | `min`, `max` | integers, inclusive | The accepted range, **in the dialect's own numbering**. A value outside it is `out-of-range`. |
 | `names` | `month` \| `dow` | Three-letter names are accepted here: `JAN`..`DEC`, or `SUN`..`SAT`. Matching is case-insensitive. |
 | `sundayIs` | `0` \| `1` | The number this dialect writes Sunday as, in `dayOfWeek`. Drives both name resolution and canonicalisation. Absent means 0. |
-| `tokens` | subset of `?` `L` `L-n` `W` `LW` `nL` `#` | The special tokens this field *supports*. **An absent key means the empty set** - the field supports none of them - so it is not a shorthand for "all". No vixie field carries the key, which is why `L` in a vixie day-of-month is flagged. A token that the grammar can parse but this list omits is **not** an error: it parses, the term gets `unsupported: true`, and the engine still evaluates it. That keeps the simulator useful on questionable input and gives a later lint pass its rule without re-parsing. |
+| `tokens` | subset of `?` `?*` `L` `L-n` `W` `LW` `nL` `#` | The special tokens this field *supports*. **An absent key means the empty set** - the field supports none of them - so it is not a shorthand for "all". No vixie field carries the key, which is why `L` in a vixie day-of-month is flagged. A token that the grammar can parse but this list omits is **not** an error: it parses, the term gets `unsupported: true`, and the engine still evaluates it. That keeps the simulator useful on questionable input and gives a later lint pass its rule without re-parsing. `?*` (Kubernetes, every field) means this field accepts `?` as an exact synonym for `*`: it parses to a term of kind `any`, not `unspecified`, so it counts as a star under the dialect's `star` strategy exactly as a literal `*` does, and it can never be `unsupported` (there is no separate `?` token check once `?*` applies). |
 | `optional` | boolean | This trailing field may be omitted (Quartz `year`). Fields before it are required. |
 
 Vixie's `dayOfWeek` runs `0-7` with `sundayIs: 0`, so Sunday is both `0` and `7`. Quartz's runs `1-7`
@@ -93,25 +102,51 @@ is removed rather than left for every port to implement blind.
   the dialect's order; fewer than the required count is `field-count`. Extra tokens are `trailing`
   when `trailingCommand`, `field-count` otherwise.
 
+### `star`
+
+Whether a field counts as a "star", read by two consumers: the `domDow` `or` rule below, and the
+engine's fixed-time test (a schedule is fixed-time when neither its minute nor its hour field is a
+star). `Field.star` is set once per field at parse time, by the *dialect's own* strategy - dialects
+disagree on what counts, so the same expression can be a star under one and not under another.
+
+- **`leading`** (vixie, GitHub Actions, Quartz, AWS) - the field's first term is `*` or `*/n` (kind
+  `any`), tested purely by position: only the first comma-separated term is looked at. `*/2` **is** a
+  star (its one term is `any`); `5,*` **is not** (the first term is a plain range - the trailing `*` is
+  never reached). DERIVATION H1.
+- **`unstepped-term`** (Kubernetes/robfig) - **any** term in the field, not only the first, that is `*`
+  or `?*` with no step above 1 (kind `any`, `step: 1`); a step above 1 clears that term's contribution.
+  So `*/2` is **not** a star (its one term has `step: 2`) and `5,*` **is** (its second term is an
+  unstepped `any`) - the opposite of `leading` on both examples. `?*` parses to kind `any`, `step: 1`,
+  so it counts exactly as a literal `*` would. DERIVATION K10.
+
 ### `domDow` - combining day-of-month with day-of-week
 
-Each side reports `hit` (does this day match?) and `star` (does the field's first term begin with
-`*`?). A `?` term makes its side `hit: true, star: true`.
+Each side reports `hit` (does this day match?) and `star` (the field's `Field.star`, from the
+dialect's own `star` strategy above - **not** a fixed leading-`*` test). A `?` term makes its side
+`hit: true, star: true` regardless of the dialect's `star` strategy.
 
-- **`or`** (cronie) - if *either* field begins with `*`, the pair is AND; otherwise it is OR. So
-  `0 0 13 * 5` fires on the 13th *and* on every Friday, while `0 0 */2 * 1` fires only on Mondays
-  that fall on an odd day. DERIVATION H5.
-- **`exclusive-question`** (Quartz) - plain AND. Quartz requires one side to be `?`, which always
-  hits, so in practice the other field decides.
+- **`or`** (cronie, GitHub Actions, Kubernetes) - if *either* field is a star, the pair is AND;
+  otherwise it is OR. So vixie's `0 0 13 * 5` fires on the 13th *and* on every Friday, while
+  `0 0 */2 * 1` fires only on Mondays that fall on an odd day - because `star` there is the `leading`
+  strategy, which GitHub Actions also uses, so it agrees with vixie on both examples. Kubernetes shares
+  the `or` rule but reads `star` through `unstepped-term` instead, so the same two examples can disagree
+  with vixie's and GitHub's verdict on which field is a star (see the `star` examples above). DERIVATION
+  H5, K10.
+- **`exclusive-question`** (Quartz, AWS) - plain AND. Both dialects' *documentation* requires one side
+  to be `?` (Quartz's own grammar; AWS's "can't specify both" rule, A3), which always hits, so in
+  practice the other field decides - though neither dialect's `parse` actually enforces that
+  requirement (see Known deviations below).
 
 ### `dstGap` - a matching wall time a spring-forward skipped
 
 A **gap** is the set of wall times after the earlier segment's last wall second and before the later
 segment's first: for a 1-hour spring forward at 02:00, the wall times `[02:00:00, 03:00:00)`.
 
-- **`skip`** (Quartz) - no run. A wall time in the gap never produces one, and nothing is shifted into
-  the hour after it. A schedule matching both the gap hour and the hour after still fires once that
-  day. DERIVATION H4.
+- **`skip`** (Quartz, Kubernetes, AWS) - no run. A wall time in the gap never produces one, and nothing
+  is shifted into the hour after it. A schedule matching both the gap hour and the hour after still
+  fires once that day. For Kubernetes this also means **no catch-up run and no error** - the CronJob
+  just quietly loses that day's run, the flat opposite of cronie's `vixie-window`. DERIVATION H4, K11,
+  A14.
 - **`vixie-window`** (cronie) - catch-up, under two conditions:
   1. the schedule is **fixed-time**: neither the minute nor the hour field begins with `*` (H1 - a
      purely syntactic test, so `*/5` counts as a wildcard and `0-59` does not); and
@@ -124,13 +159,22 @@ segment's first: for a 1-hour spring forward at 02:00, the wall times `[02:00:00
   instant, each tagged `skipped-adjusted` and carrying the skipped wall time in `scheduled`. So vixie
   `0,30 2 * * *` across a 1-hour spring forward produces **two** runs at the same instant. Wildcard
   schedules get no catch-up; they simply continue in the new offset.
+- **`next-valid`** (GitHub Actions) - advance, for a **fixed-time** schedule only (same test as
+  `vixie-window`); a wildcard schedule gets no adjustment and simply continues in the new offset,
+  exactly as under `vixie-window`. At most **one** run per gap, regardless of how many wall times it
+  skips: the run fires at the transition instant, tagged `skipped-adjusted`, with `scheduled` set to
+  the **earliest** matching wall time in the gap - unlike `vixie-window`, later matches in the same gap
+  are not each given their own run. **No** run at all when a natural run already fires at the
+  transition instant (GitHub's own documented example, `2:30 -> 3:00`, is exactly this: the 3:00 run is
+  natural, so there is no separate advanced run). No width limit on the gap. DERIVATION G5.
 
-**The natural run.** Catch-up runs are *extra*. If the schedule also matches the wall time the
-transition instant lands on, that run is emitted too - **after** the catch-up runs, at the same
-instant, untagged and with no `scheduled`. Vixie `0 2,3 * * *` across a spring forward at 02:00
+**The natural run** (`vixie-window`). Catch-up runs are *extra*. If the schedule also matches the wall
+time the transition instant lands on, that run is emitted too - **after** the catch-up runs, at the
+same instant, untagged and with no `scheduled`. Vixie `0 2,3 * * *` across a spring forward at 02:00
 therefore yields the 02:00 catch-up and then the natural 03:00 run, both at the transition instant.
 `prev` returns that pair in the mirror order: natural run first, then the catch-up. The order is
-binding, and deep-comparing a `Run` list will catch a port that gets it backwards.
+binding, and deep-comparing a `Run` list will catch a port that gets it backwards. `next-valid` folds
+the same natural-run check into its own single-run rule above rather than emitting both separately.
 
 ### `dstOverlap` - a matching wall time a fall-back repeated
 
@@ -140,9 +184,43 @@ classified **first pass** (still on the pre-transition offset) or **second pass*
 - **`once-second`** (Quartz) - emit on the second pass only, tagged `ambiguous-second`. Java's lenient
   `Calendar` resolves an ambiguous wall time to standard time, so Quartz never produces a first-pass
   fire time. DERIVATION H6.
-- **`vixie-window`** (cronie) - a fixed-time schedule (same test as above) emits on the **first** pass
-  only, tagged `ambiguous-first`; a wildcard schedule follows real time and emits on **both**, tagged
-  `ambiguous-first` and `ambiguous-second`. DERIVATION H1, H6.
+- **`vixie-window`** (cronie, GitHub Actions) - a fixed-time schedule (same test as above) emits on the
+  **first** pass only, tagged `ambiguous-first`; a wildcard schedule follows real time and emits on
+  **both**, tagged `ambiguous-first` and `ambiguous-second`. DERIVATION H1, H6, G5.
+- **`repeat`** (Kubernetes/robfig) - emit on **both** passes, tagged `ambiguous-first` and
+  `ambiguous-second`, for a fixed-time and a wildcard schedule alike; robfig's matcher only ever reads
+  the wall clock (hour, minute), so it cannot tell the second occurrence from the first and simply
+  matches it again. Kubernetes creates two distinct Jobs for the pair. DERIVATION K13.
+- **`once-first`** (AWS EventBridge Scheduler) - emit on the **first** pass only, tagged
+  `ambiguous-first`, for every schedule - fixed-time or wildcard, since the documentation makes no
+  such distinction (see the Assumptions list under Provenance below). DERIVATION A15, A16.
+
+### `interval` - "every N seconds from an anchor"
+
+How a dialect spells an interval schedule. A dialect whose `interval` is not `none` accepts a second
+input form entirely separate from its `family` grammar: the whole expression is the interval, there are
+no `fields`, and `Schedule.interval = { seconds, raw, span }` is set instead (see Forms below).
+`seconds` is always a positive integer of whole seconds; the run-time semantics that turn it into actual
+runs are in "Run-time semantics" further down. `none` marks a dialect with no interval form at all.
+
+- **`go-duration`** (`@every <duration>`, Kubernetes/robfig) - the text after `@every ` and one or more
+  spaces, read as Go's `time.ParseDuration`: `([-+]?(\d*(\.\d*)?)(ns|us|µs|μs|ms|s|m|h))+`, or a bare
+  `0`. There is no day or week unit. Each unit term contributes `intPart * unitNs` plus, for a
+  fractional part, `floor(float64(fraction) * (unitNs / 10^digits))` - Go computes the fractional
+  nanoseconds as a `float64` multiplication, truncated, not as exact decimal arithmetic, and this is
+  mirrored exactly (not simplified to an equivalent-looking integer computation) because the two can
+  disagree by a nanosecond near a rounding boundary. Terms accumulate in order; the running total must
+  stay **below 2^63 nanoseconds** (Go's `int64` duration range) after every term or the whole thing is
+  `bad-interval`. Once total nanoseconds are known: a duration under 1 second is clamped **up** to 1
+  second, then the result is truncated **down** to whole seconds (`@every 1500ms` -> 1s, not 2s; `@every
+  -1h` -> 1s, since a negative delay is also clamped up). `@every` with no duration, or one
+  `time.ParseDuration` cannot read, is `bad-interval`. DERIVATION K7.
+- **`aws-rate`** (`rate(value unit)`, AWS EventBridge) - `value` a run of 1-15 digits read as an
+  integer, `unit` one of `minute`/`minutes`, `hour`/`hours`, `day`/`days`, **singular exactly when
+  `value` is `1`** and plural otherwise (`rate(1 hours)` and `rate(5 hour)` are both `bad-interval`).
+  `seconds = value * unitSeconds`; a result that is not a JavaScript safe integer (overflow), that is
+  `0`, a missing or malformed value/unit, or an unclosed `rate(...)`, is `bad-interval` (or
+  `bad-wrapper` when the final `)` is missing). DERIVATION A9.
 
 ## `matches`
 
@@ -176,6 +254,54 @@ disagree.
   silently drop the rest of such a group; ask for a full page and de-duplicate on `at` plus
   `scheduled`.
 - Runs are never returned outside the range a platform timestamp can hold.
+- **Interval schedules** (`Schedule.interval` set) are pure arithmetic on an **anchor**, never a
+  calendar walk: the *k*-th run is `anchor + k * interval.seconds`, for `k >= 1` when the dialect's
+  `intervalFirst` is `after-anchor` (Kubernetes: the first run is one interval *after* the schedule was
+  created) or `k >= 0` when it is `at-anchor` (AWS: the first run is the anchor instant itself). The
+  anchor comes from `RunOptions.anchor`, **floored to a whole second**; when omitted it defaults to
+  `from` - "if this schedule were created right now, when would it next fire." An interval run **never**
+  carries a `dst` tag: intervals ignore time zones and DST entirely, and `local` is just that instant
+  reformatted into the schedule's zone with whatever offset applies there at that moment. `from`,
+  `until`, `inclusive`, the `count` clamp (1..1000, default 10) and the 5-year horizon all apply to an
+  interval schedule exactly as to a calendar one.
+- **`matches` on an interval schedule requires an explicit `anchor`** in its options; with none it is
+  unconditionally `false` - there is no default run sequence to test the instant against, because
+  `matches` takes no `from` to fall back on the way `next`/`prev` do.
+
+## Forms
+
+A dialect's parse tries these in order; the first one that applies wins, and later ones are never
+attempted.
+
+1. **Interval form claimed?** If `interval` is not `none`, and the input (left-trimmed of whitespace)
+   matches that interval strategy's own claim test (`go-duration`: starts with `@every` followed by
+   whitespace or end-of-string; `aws-rate`: starts with `rate(`), the whole input is read as an
+   interval. `family` and `wrapper` are never tried: a malformed interval is always `bad-interval` (or
+   `bad-wrapper` for `aws-rate` missing its closing `)`), never a field error. On success `Schedule`
+   has empty `fields` and a `Schedule.interval`.
+2. **Wrapper.** Otherwise, if `wrapper` is not `null` and the trimmed input starts with `wrapper + "("`,
+   the input must close with exactly one final `)` and contain no other `(` or `)` inside; anything
+   else is `bad-wrapper`, spanning the whole trimmed input. On success the wrapper keyword and its two
+   parentheses are **blanked to spaces**, not cut out of the string - the text handed to the tokenizer
+   is the same length as `source`, so every span the tokenizer reports still indexes the untouched
+   `source`, and the wrapped fields effectively sit at the same offsets they would if typed bare. An
+   interior that is empty or all whitespace (`cron()`) tokenizes to zero tokens, which is a
+   `field-count` error spanning the whole trimmed input, not a `bad-wrapper`.
+3. **Fields.** The (possibly unwrapped) text is tokenized and handed to the dialect's `family` parser,
+   as described above.
+
+Both `wrapper` and every interval strategy's keyword (`@every`, `rate`) are matched
+**case-sensitively**: `CRON(...)`, `RATE(5 minutes)` and `@EVERY 1h` do not claim their forms at all,
+and fall straight through to field parsing (where they typically fail some other way - `CRON(...)` as
+an out-of-range or bad-token first field, for instance).
+
+**Claimed-form detection.** A dialect *claims* an input when step 1 or step 2 above would apply to it
+for that dialect: its own interval strategy claims the text, or the text is wrapped in its own
+`wrapper` keyword. When `options.dialect` is omitted, if **any** dialect in `dialects/index.json` claims
+the input, detection tries **only** the claiming dialects - a form that belongs to some dialects (an
+interval keyword, a wrapper) is treated as theirs alone, so its errors are theirs too, and a dialect
+that does not claim the form is never even attempted against it, whether or not that dialect's plain
+field grammar could otherwise tokenize the same text.
 
 ## Parse cases (`cases/parse/*.json`)
 
@@ -195,26 +321,47 @@ That block shows every key a parse case may carry, so it is not a copy of the fi
 
 `expect` is compared **in full** against the returned `Schedule`: `dialect`, `source` (the untouched
 input), `timezone`, every `Field` with its `raw`, `span`, `terms`, `values` and `star`, and the
-optional `macro`, `trailing` and `candidates`. Absent optional keys must be absent, not null.
+optional `macro`, `trailing`, `candidates` and `interval`. Absent optional keys must be absent, not
+null.
 
 - `Field.values` holds the expansion of `any` and `range` terms only, canonicalised, sorted and
   de-duplicated. The dynamic kinds (`last`, `lastWeekday`, `nearestWeekday`, `lastDow`, `nthDow`) and
   `unspecified` contribute nothing; the engine evaluates them per month.
-- `Field.star` is true when the field's first term is `*` or `*/n`. Two strategies read it.
+- `Field.star` is the dialect's own `star` strategy applied to the field's terms (`leading` or
+  `unstepped-term` above) - **not** a fixed "first term is `*`" test; which strategy a dialect uses
+  changes `Field.star` for the same input (see `star` under Strategies).
 - A macro's fields all report the **macro token's** span, since they were never typed.
 - `trailing.text` is sliced from `source` between the first and last trailing token, so it keeps the
   whitespace between them.
+- `Schedule.interval`, present only for a dialect's interval form (see `interval` under Strategies and
+  Forms above), is compared as `{ seconds, raw, span }`: `seconds` the resolved whole-second length,
+  `raw` the interval expression exactly as typed (whitespace-trimmed, its own wrapper - `@every ...` or
+  `rate(...)` - included), `span` its offsets into the untouched `source`. `Schedule.fields` is `[]` for
+  an interval schedule, the same as for a no-schedule macro (`@reboot`).
+
+`expectSummary` is a **partial** expectation, for a case where the whole `Schedule` would be noise.
+`dialect` is always compared. `candidates` and `unsupported` are compared **exactly** whenever named in
+the case - and naming either means its absence in the parsed result must be absence (or emptiness)
+there too, not "don't care"; omitting the key from `expectSummary` altogether is what skips the check.
+`values` and `star` compare only the field names they list, by exact value, ignoring every other field
+the schedule has. `interval` is compared exactly as `{ seconds }`; naming it with no `interval` present
+on the parsed `Schedule` fails, and so does the reverse - an `expectSummary` that omits `interval`
+requires `Schedule.interval` to be **absent**.
 
 `expectError` is `{ "code", "span" }`. The codes are a closed list: `empty`, `field-count`,
 `bad-token`, `out-of-range`, `bad-step`, `bad-range`, `unknown-macro`, `unknown-dialect`,
-`bad-timezone`. Parsing never throws and never returns a partial schedule.
+`bad-timezone`, `bad-wrapper`, `bad-interval`. Parsing never throws and never returns a partial
+schedule.
 
-**Detection** (`options.dialect` omitted) walks `dialects/index.json` in order. A dialect is a
-candidate when it parses the input with no `unsupported` term. Candidates that needed `trailing` are
-dropped as long as one without it remains, so `0 0 12 * * ?` is Quartz rather than Vixie with a stray
-`?` as a command. The first survivor wins, and `candidates` is set only when more than one survived.
-If nothing qualifies: the first dialect that parsed at all, else the first error that is not
-`field-count`, else the first error. No detection heuristic lives anywhere but this rule.
+**Detection** (`options.dialect` omitted) first narrows to the claiming dialects if any dialect claims
+the input (see Forms above); within that pool (or the full `dialects/index.json` order if none claims
+it), a dialect is a candidate when it parses the input with no `unsupported` term. Candidates that
+needed `trailing` are dropped as long as one without it remains, so `0 0 12 * * ?` is Quartz rather than
+Vixie with a stray `?` as a command. The first survivor wins, and `candidates` is set only when more
+than one survived - `parse('0 9 * * 1')` (no restricted token any dialect disagrees on) gives `dialect:
+'vixie'` and `candidates: ['vixie', 'kubernetes', 'github-actions']`. If nothing qualifies: the first
+dialect that parsed at all, else the first error that is not `field-count`, else the first error. No
+detection heuristic lives anywhere but this rule.
 
 **Tokenizing.** Fields are runs of non-whitespace, found with the JavaScript regex `/\S+/g`. A port
 must match **that** whitespace set, not its own: `\s` in JavaScript is U+0009-U+000D, U+0020, U+00A0,
@@ -233,6 +380,7 @@ will split a valid expression differently.
   "timezone": "America/New_York",
   "from": "2026-03-07T12:00:00Z",
   "until": "2026-03-09T00:00:00Z",        // optional, inclusive
+  "anchor": "2026-09-21T10:00:00Z",       // optional, RunOptions.anchor - only meaningful for an interval schedule
   "count": 3,
   "expect": [
     { "at": "2026-03-08T07:00:00Z", "local": "2026-03-08T03:00:00-04:00",
@@ -245,8 +393,13 @@ will split a valid expression differently.
 ```
 
 That block likewise shows every optional key at once rather than copying the file: the real
-`vixie-gap-fixed-time-catches-up` in `cases/next/dst.json` sets no `until`, `notMatching` or
+`vixie-gap-fixed-time-catches-up` in `cases/next/dst.json` sets no `until`, `anchor`, `notMatching` or
 `skipDerived`, and its `expect` holds three runs, of which only the first is shown here.
+
+**`anchor`** is `RunOptions.anchor`, passed to `next`/`prev` when the case sets it. Omitting it from a
+case means `next`/`prev` are called with **no** `anchor` option at all, so the engine defaults it to
+`from` - the anchor is not "there is no anchor", it is "the anchor is whatever `from` is". It only
+matters for an interval schedule; a calendar schedule ignores it.
 
 Each entry of `expect` is a `Run`:
 
@@ -274,15 +427,19 @@ A `next` case is not only a `next` assertion. For each case, after asserting tha
 `next(schedule, {from, count, until})` deep-equals `expect`, and that every `notMatching` instant does
 not match, a runner must also - unless `skipDerived` is set or `expect` is empty - check:
 
-1. **`matches` agrees with every expected run.** For each `e` in `expect`, `matches(schedule, e.at)`
-   is true.
-2. **`matches` is false one unit earlier**, where the unit is the dialect's resolution (1 s if it has
-   a `second` field, else 60 s). Skip this for an `e.at` that is not more than one unit after the
-   previous expected run - that guards the equal-instant groups, and the first comparison is against
-   `from`.
+Every derived check below passes `anchor: (case.anchor ?? case.from)` explicitly, because `matches` has
+no `from` of its own to default an omitted anchor to the way `next`/`prev` do; `notMatching` checks pass
+the same anchor.
+
+1. **`matches` agrees with every expected run.** For each `e` in `expect`, `matches(schedule, e.at,
+   { anchor })` is true.
+2. **`matches` is false one unit earlier**, where the unit is the dialect's resolution: **1 second**
+   if the schedule has a `second` field **or is an interval schedule**, **60 seconds** otherwise. Skip
+   this for an `e.at` that is not more than one unit after the previous expected run - that guards the
+   equal-instant groups, and the first comparison is against `from`.
 3. **`prev` returns the same runs, reversed.** `prev(schedule, {from: last.at + 1 second, count:
-   expect.length})` deep-equals `expect` reversed, `dst` and `scheduled` included. This is what pins
-   the order inside an equal-instant group without a separate case.
+   expect.length, anchor})` deep-equals `expect` reversed, `dst` and `scheduled` included. This is what
+   pins the order inside an equal-instant group without a separate case.
 
 Deriving three assertions from one case is deliberate: it means a port cannot satisfy the corpus by
 special-casing `next`.
@@ -295,8 +452,54 @@ Every case carries `provenance.kind`:
 - **`derived`** - read out of reference implementation source. `source` is required and cites
   `DERIVATION.md` by section (`corpus/DERIVATION.md H2`), which in turn quotes the file, function and
   line it was read from.
+- **`assumed`** - the platform's own documentation is silent on this behaviour (there is no reference
+  implementation to fall back on either, for GitHub Actions and AWS EventBridge). `source` is required
+  and cites the `DERIVATION.md` entry that records the silence and states the choice made. An `assumed`
+  case is the corpus's own decision, not a fact read off something that runs; a port that later gets to
+  test against the real platform should treat every `assumed` case as the first thing to re-check.
 - **`captured`** - recorded from a running reference implementation. `platform` and `recording` are
   required. No case uses this yet; there is no capture harness.
+
+### Assumptions
+
+Every behaviour pinned only by an `assumed` case, in one place. Found by searching the corpus for
+`"kind": "assumed"` and reading each case's `source`.
+
+1. **G1 - `7` as Sunday, and a reversed range, in GitHub Actions.** GitHub's docs give the field ranges
+   (`0-6` for day-of-week) but never say whether `7` is also accepted, and never mention reversed ranges
+   at all. Assumed both are errors. Cases: `github-sunday-seven-is-an-error`,
+   `github-reversed-range-is-an-error`.
+2. **G5 (gap) - which schedules GitHub Actions advances out of a spring-forward gap.** GitHub documents
+   only a single fixed-time example (`2:30 -> 3:00`). Assumed only a fixed-time schedule advances, one
+   run per gap, none when a natural run already exists at the transition instant, and a wildcard
+   schedule is left alone to continue in real time (strategy `next-valid`). Cases:
+   `github-gap-two-skipped-times-advance-once`, `github-gap-natural-run-is-not-doubled`,
+   `github-gap-wildcard-follows-real-time`.
+3. **G5 (overlap) - GitHub Actions' fall-back behaviour.** GitHub's docs describe the gap but say
+   nothing about the overlap. Assumed cronie's rule: a fixed-time schedule fires on the first pass only,
+   a wildcard schedule fires on both (strategy `vixie-window`). Cases:
+   `github-overlap-fixed-time-runs-once-on-the-first-pass`, `github-overlap-wildcard-runs-on-both-passes`.
+4. **A2 - whether AWS accepts `0` for Sunday.** AWS's docs establish `1` = Sunday only by example (never
+   in prose) and never say whether `0` is also accepted the way it names `7` as an alternate Saturday.
+   Assumed `0` is `out-of-range`. Case: `aws-zero-is-not-a-day-of-week`.
+5. **A5 - `*/n` in AWS.** AWS's docs document only the `first/step` form (`1/10`); `*/n` never appears
+   in either doc. Assumed `*/n` is legal, with the same meaning as `min/n`. Case:
+   `aws-star-slash-step-is-allowed`.
+6. **A10 - when an AWS rate schedule first fires.** AWS's docs say a rate schedule "starts when you
+   create" the rule and "starts invoking ... immediately", without saying whether the very first
+   invocation is at the anchor instant or one interval after it. Assumed at-anchor: the first run is the
+   anchor instant itself (`intervalFirst: "at-anchor"`). Case: `aws-rate-first-run-is-the-anchor`.
+7. **A13 - AWS's default time zone.** The `ScheduleExpressionTimezone`/`ScheduleExpressionTimeZone`
+   parameter is documented as optional with no default value stated. Assumed UTC
+   (`defaultTimezone: "utc"`). No case rests on this one: it is a fact about the *reference* platform's
+   own default, recorded on the dialect for a future port to reproduce; this library's own `parse`
+   always defaults every dialect's `timezone` to UTC regardless, so nothing here distinguishes AWS's
+   assumed default from any other dialect's.
+8. **A16 - whether AWS's DST rule is fixed-time-only.** The DST section's only worked example is a
+   single fixed-time schedule; there is no wildcard example for either the gap or the overlap. Assumed
+   the documented fixed-time rule applies to every schedule alike - skip a wall time in a gap, fire once
+   on the first pass of an overlap (strategy `once-first`, and `dstGap: "skip"` needs no schedule-shape
+   test to begin with). Case: `aws-overlap-wildcard-fires-on-the-first-pass-only`.
 
 ## Known deviations from the reference implementations
 
@@ -326,3 +529,32 @@ not the reference, and should carry this list forward.
    bisect to the second wherever it changed. Two offset changes less than a probe day apart would
    therefore be seen as one. No case depends on such a zone, and the deviation is at least identical
    across ports because the algorithm is part of the contract. Parked.
+6. **robfig's descriptor matching is whitespace- and case-exact; this corpus's macros are not.**
+   robfig's `parseDescriptor` matches the raw string byte-for-byte, so `"@daily "` (a trailing space)
+   and `"@DAILY"` both fail there as `unrecognized descriptor` (DERIVATION K6). Here, the field
+   tokenizer already discards surrounding whitespace before a macro token is even looked at (see
+   Tokenizing above), so `"@daily "` and `"@daily"` parse identically; macro names remain
+   case-sensitive (`macros` in dialect data), so `"@DAILY"` is still `unknown-macro`.
+7. **Kubernetes rejects any schedule containing the substring `TZ` at admission; here it is an
+   ordinary parse error.** `validation.go` rejects any CronJob `spec.schedule` containing `TZ` outright
+   (DERIVATION K8), independently of whether it looks like a `TZ=`/`CRON_TZ=` prefix. This library has
+   no `TZ=`-prefix form for any dialect, so the same text simply fails as whatever a stray `TZ...` token
+   fails as in the ordinary field grammar (typically `bad-token` or `out-of-range` on the first field) -
+   there is no dedicated `TZ`-rejection code path or error code.
+8. **Several documented AWS/GitHub limits are not enforced by `parse`.** The GitHub Actions 5-minute
+   floor (G6), AWS's "cron expressions that lead to rates faster than 1 minute are not supported" limit
+   (A7), AWS's "only one `#` expression in the day-of-week field" limit (A4), and AWS's "exactly one of
+   day-of-month/day-of-week must be `?`" rule (A3) are all left for a later lint pass: `parse` accepts a
+   schedule that violates any of them, and no case asserts an error for any of these four rules.
+9. **Classic EventBridge rules are UTC-only; this dialect accepts any zone.** Classic (legacy)
+   EventBridge rules are always UTC (A12); the `aws` dialect here models EventBridge **Scheduler**'s
+   zone support (`ScheduleExpressionTimezone`, A13) instead, so a `timezone` other than UTC is accepted
+   even though it would be meaningless on a classic rule.
+10. **AWS one-time `at(...)` schedules are not supported.** EventBridge Scheduler's `at(yyyy-mm-ddThh:mm:ss)`
+    one-time form (A17) has no dialect entry, no case and no strategy id; it is out of scope for this
+    corpus.
+11. **The Kubernetes evidence is a hand trace, not a run of robfig/cron.** Every `K1`-`K16` verdict in
+    `DERIVATION.md` is a manual reading of the quoted Go source (`[hand]`), cross-checked by a Python
+    line-by-line transcription of the same source (`[sim]`) - no Go toolchain ran the real library. The
+    two DST sections (K11-K13) are called out there as the ones most in need of a real-build
+    re-verification before this corpus is trusted at face value for Kubernetes.

@@ -6,9 +6,17 @@ Parse cron schedules and compute when they run, correctly across timezones and D
 - Never throws. `parse` returns a result; `next`, `prev` and `matches` return `[]` or `false` for input they cannot use.
 - DST behaviour follows what each scheduler really does, derived from the cronie and Quartz source, not a guess.
 - Every parsed field and term carries its character span in the source, for editors and error underlines.
-- About 6 KB gzipped.
+- About 7 KB gzipped.
 
-This is an early version. It supports two dialects: `vixie` (Linux crontab, matching cronie) and `quartz` (Java Quartz). More dialects, `describe`, `lint` and `convert` are planned.
+Five dialects are supported. `describe`, `lint` and `convert` are planned.
+
+| Dialect | What it is | A run in a gap (spring forward) | A run in an overlap (fall back) |
+| --- | --- | --- | --- |
+| `vixie` | Linux crontab, matching cronie | A fixed-time job catches up, once per skipped wall time it matches | A fixed-time job fires once, on the first pass |
+| `kubernetes` | A CronJob's `spec.schedule` (robfig/cron v3, as pinned by Kubernetes) | Silently skipped - no run, no catch-up | Fires twice, once on each pass |
+| `github-actions` | A workflow's `on.schedule` `cron:` entry | A fixed-time job advances to the next valid time, once per gap | A fixed-time job fires once, on the first pass |
+| `quartz` | Java Quartz's `CronExpression` | Skipped - no run | Fires once, on the second pass |
+| `aws` | EventBridge's `cron(...)` and `rate(...)` | Skipped - no run | Fires once, on the first pass |
 
 ## Install
 
@@ -28,6 +36,7 @@ if (r.ok) {
   r.value.dialect;          // 'vixie' (detected)
   r.value.fields[4].values; // [1, 2, 3, 4, 5]  (Sunday is always 0)
   r.value.fields[4].span;   // [8, 15]
+  r.value.candidates;       // ['vixie', 'kubernetes', 'github-actions'] - all three read this the same way
 }
 
 parse('0 25 * * *');
@@ -38,8 +47,25 @@ parse('0 25 * * *');
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `dialect` | detected | `'vixie'` or `'quartz'`. When omitted, the dialect is detected from the expression; if more than one fits, `candidates` lists them. |
+| `dialect` | detected | `'vixie'`, `'kubernetes'`, `'github-actions'`, `'quartz'` or `'aws'`. When omitted, the dialect is detected from the expression; if more than one fits, `candidates` lists them. |
 | `timezone` | `'UTC'` | An IANA zone name such as `'America/New_York'`. |
+
+Detection is honest about ambiguity rather than guessing: a plain five-field expression parses
+identically under several dialects, so `candidates` names all of them.
+
+```ts
+parse('0 9 * * 1');
+// r.value.dialect: 'vixie', r.value.candidates: ['vixie', 'kubernetes', 'github-actions']
+```
+
+AWS expressions may be wrapped in `cron(...)`; the bare fields parse too. Spans still index the
+original string, wrapper included:
+
+```ts
+const r = parse('cron(15 10 ? * 6L *)');
+// r.value.dialect: 'aws'
+// r.value.fields[0]: { name: 'minute', raw: '15', span: [5, 7], ... } - span skips the "cron(" prefix
+```
 
 It also understands macros such as `@daily`, and a pasted crontab line with a command on the end (the command is returned as `trailing`).
 
@@ -73,8 +99,61 @@ matches('*/15 * * * *', new Date('2026-09-21T00:15:00Z')); // true
 | `count` | 10 | How many runs to return, from 1 to 1000. |
 | `until` | 5 years from `from` | Stop here. The search never looks further than 5 years. |
 | `inclusive` | `false` | Include a run that falls exactly on `from`. |
+| `anchor` | `from` | When an interval schedule (`@every`, `rate(...)`) was created or started; its runs are `anchor + k * interval`. Ignored by calendar schedules. See Intervals below. |
 
 Each run is `{ at, local, dst?, scheduled? }`: the instant, the wall time in the schedule's zone with its offset, and DST details when they apply.
+
+`matches(schedule, at, opts?)` takes a third argument, `{ anchor? }`: the same `anchor` as `next`/`prev`, required for an interval schedule (there is no `from` to default it to; without one `matches` is always `false` there) and ignored by a calendar schedule.
+
+## Intervals
+
+Kubernetes CronJobs and AWS EventBridge also accept an interval form - "every N seconds", not a calendar expression - as their whole schedule text instead of five fields:
+
+```ts
+import { parse, next, matches } from '@peppercron/core';
+
+parse('@every 1h30m', { dialect: 'kubernetes' });
+// r.value.interval: { seconds: 5400, raw: '@every 1h30m', span: [0, 12] }, r.value.fields: []
+
+parse('rate(5 minutes)', { dialect: 'aws' });
+// r.value.interval: { seconds: 300, raw: 'rate(5 minutes)', span: [0, 15] }
+```
+
+An interval schedule's runs are pure arithmetic - `anchor + k * interval.seconds` - not a calendar walk, so `next`, `prev` and `matches` need an **anchor**: when the schedule was created. Pass one with the `anchor` option; when omitted it defaults to `from`, i.e. "if this were created right now, when would it next fire":
+
+```ts
+const k = parse('@every 5m', { dialect: 'kubernetes' });
+next(k.value, { from: new Date('2026-09-21T10:00:00Z'), count: 2 });
+// no anchor given, so it defaults to `from`:
+// [ { at: 2026-09-21T10:05:00.000Z, local: '2026-09-21T10:05:00+00:00' },
+//   { at: 2026-09-21T10:10:00.000Z, local: '2026-09-21T10:10:00+00:00' } ]
+
+matches(k.value, new Date('2026-09-21T10:05:00Z'));                                    // false - no anchor
+matches(k.value, new Date('2026-09-21T10:05:00Z'), { anchor: new Date('2026-09-21T10:00:00Z') }); // true
+```
+
+`prev` and `matches` need a **real** anchor the same way `next` does - without one, `matches` on an interval schedule is always `false`, since there is no default run sequence to test an instant against.
+
+Kubernetes and AWS disagree on which run is first. Kubernetes's `@every` fires one interval *after* the anchor; AWS's `rate(...)` fires *at* the anchor itself:
+
+```ts
+const anchor = new Date('2026-09-21T10:00:00Z');
+next(parse('@every 5m', { dialect: 'kubernetes' }).value, { anchor, from: anchor, inclusive: true, count: 1 });
+// [ { at: 2026-09-21T10:05:00.000Z, local: '2026-09-21T10:05:00+00:00' } ]  -- one interval after the anchor
+
+next(parse('rate(5 minutes)', { dialect: 'aws' }).value, { anchor, from: anchor, inclusive: true, count: 1 });
+// [ { at: 2026-09-21T10:00:00.000Z, local: '2026-09-21T10:00:00+00:00' } ]  -- the anchor itself
+```
+
+Intervals ignore time zones and DST entirely - `rate(1 day)` is a fixed 24 hours of absolute time, not "the same wall clock time tomorrow":
+
+```ts
+const s = parse('rate(1 day)', { dialect: 'aws', timezone: 'America/New_York' });
+const a = new Date('2026-03-07T17:00:00Z'); // 12:00 EST, the day before a spring-forward
+next(s.value, { anchor: a, from: a, count: 2 });
+// [ { at: 2026-03-08T17:00:00.000Z, local: '2026-03-08T13:00:00-04:00' },  -- 24h later, now 13:00 local (DST shifted the wall clock)
+//   { at: 2026-03-09T17:00:00.000Z, local: '2026-03-09T13:00:00-04:00' } ]
+```
 
 ## DST
 
@@ -93,9 +172,11 @@ next(s.value, { from: new Date('2026-03-07T12:00:00Z'), count: 3 });
 
 **Clocks go back (an overlap).** A wall time happens twice. cronie runs a fixed-time job on the first pass only; Quartz fires on the second pass only. Runs in an overlap are tagged `ambiguous-first` or `ambiguous-second`.
 
+**The other three dialects, in a sentence each.** Kubernetes silently skips a run that falls in a gap and, in an overlap, fires it twice, once on each pass. GitHub Actions advances a gap run to the next valid time (its own documented example: `2:30 -> 3:00`); its overlap behaviour is undocumented and this library's choice - a fixed-time job on the first pass only, like cronie - is an assumption, not a spec. AWS EventBridge skips a gap run and, in an overlap, fires it once, on the first pass only.
+
 Catch-up runs can share one instant, so runs are non-decreasing rather than strictly increasing. If you page with `from: lastRun.at`, ask for a full page rather than `count: 1`, and de-duplicate on `at` plus `scheduled`.
 
-The exact rules, and the source code they were derived from, are in the [corpus](../../corpus/README.md).
+The exact rules, and the source code and documentation they were derived from, are in the [corpus](../../corpus/README.md); its [Assumptions list](../../corpus/README.md#assumptions) names every behaviour that isn't actually documented anywhere, including GitHub's overlap and AWS's wildcard-schedule DST behaviour.
 
 ## Custom timezone data
 
