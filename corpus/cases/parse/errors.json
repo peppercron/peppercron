@@ -7,6 +7,7 @@
   { "id": "zero-step", "input": "*/0 * * * *", "options": { "dialect": "vixie" }, "expectError": { "code": "bad-step", "span": [0, 3] }, "provenance": { "kind": "spec" } },
   { "id": "unknown-day-name", "input": "0 0 * * FOO", "options": { "dialect": "vixie" }, "expectError": { "code": "bad-token", "span": [8, 11] }, "provenance": { "kind": "spec" } },
   { "id": "bad-term-inside-a-list", "input": "0 1,99,3 * * *", "options": { "dialect": "vixie" }, "expectError": { "code": "out-of-range", "span": [4, 6] }, "provenance": { "kind": "spec" } },
+  { "id": "empty-list-item", "input": "1,,2 * * * *", "options": { "dialect": "vixie" }, "expectError": { "code": "bad-token", "span": [2, 2] }, "provenance": { "kind": "spec" } },
   { "id": "unknown-macro", "input": "@bogus", "expectError": { "code": "unknown-macro", "span": [0, 6] }, "provenance": { "kind": "spec" } },
   { "id": "vixie-step-after-single-value", "input": "5/15 * * * *", "options": { "dialect": "vixie" }, "expectError": { "code": "bad-step", "span": [0, 4] }, "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H7" } },
   { "id": "quartz-nth-out-of-range", "input": "0 0 12 ? * 6#6", "options": { "dialect": "quartz" }, "expectError": { "code": "out-of-range", "span": [11, 14] }, "provenance": { "kind": "spec" } },

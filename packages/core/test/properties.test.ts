@@ -17,8 +17,16 @@ function field(min: number, max: number): fc.Arbitrary<string> {
   );
 }
 
+/** Vixie writes Sunday as 0 or 7, so reversed ranges ending on Sunday are a real class (DERIVATION H3). */
+const vixieDow = fc.oneof(
+  field(0, 7),
+  fc.integer({ min: 1, max: 7 }).map((n) => `${n}-0`),
+  fc.tuple(fc.integer({ min: 1, max: 7 }), fc.integer({ min: 1, max: 7 })).map(([n, step]) => `${n}-0/${step}`),
+  fc.integer({ min: 0, max: 6 }).map((n) => `${n}-7`),
+);
+
 const vixieExpr = fc
-  .tuple(field(0, 59), field(0, 23), field(1, 31), field(1, 12), field(0, 7))
+  .tuple(field(0, 59), field(0, 23), field(1, 31), field(1, 12), vixieDow)
   .map((parts) => parts.join(' '));
 
 const quartzDays = fc.oneof(

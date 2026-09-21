@@ -28,6 +28,20 @@ describe('expandTerm', () => {
     expect(expandTerm({ kind: 'range', from: 22, to: 2, step: 1 }, vHour, v)).toEqual([]);
     expect(expandTerm({ kind: 'range', from: 22, to: 2, step: 1 }, vHour, { ...v, rangeWrap: 'error' })).toBeNull();
   });
+
+  // cronie rewrites a reversed day-of-week range ending at 0 to end at 7 (DERIVATION H3, entry.c:641-643).
+  it('extends a day-of-week range that ends on the dialect Sunday past the week end', () => {
+    expect(expandTerm({ kind: 'range', from: 6, to: 0, step: 1 }, vDow, v)).toEqual([6, 7]);
+    expect(expandTerm({ kind: 'range', from: 5, to: 0, step: 1 }, vDow, v)).toEqual([5, 6, 7]);
+    expect(expandTerm({ kind: 'range', from: 1, to: 0, step: 2 }, vDow, v)).toEqual([1, 3, 5, 7]);
+  });
+
+  it('leaves the rewrite alone where the dialect cannot express Sunday twice', () => {
+    // Quartz numbers Sunday 1 with max 7, so 7 is Saturday, not a second Sunday: the ordinary wrap applies.
+    expect(expandTerm({ kind: 'range', from: 6, to: 1, step: 1 }, qDow, q)).toEqual([6, 7, 1]);
+    // Outside day-of-week the cronie rewrite stays parked: 5-0 in an hour field is still empty.
+    expect(expandTerm({ kind: 'range', from: 5, to: 0, step: 1 }, vHour, v)).toEqual([]);
+  });
 });
 
 describe('normalise', () => {

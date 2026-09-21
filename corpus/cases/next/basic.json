@@ -1,5 +1,15 @@
 [
   {
+    "id": "vixie-dow-range-ending-in-sunday-fires-on-weekends", "dialect": "vixie", "input": "0 10 * * SAT-SUN", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-09-26T10:00:00Z", "local": "2026-09-26T10:00:00+00:00" },
+      { "at": "2026-09-27T10:00:00Z", "local": "2026-09-27T10:00:00+00:00" },
+      { "at": "2026-10-03T10:00:00Z", "local": "2026-10-03T10:00:00+00:00" }
+    ],
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H3" }
+  },
+  {
     "id": "vixie-weekly", "dialect": "vixie", "input": "0 2 * * 1", "timezone": "UTC",
     "from": "2026-09-21T00:00:00Z", "count": 3,
     "expect": [
