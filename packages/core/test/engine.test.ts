@@ -189,4 +189,12 @@ describe('hostile input', () => {
     expect(core.next({} as Schedule, { from })).toEqual([]);
     expect(core.next(null as unknown as Schedule, { from })).toEqual([]);
   });
+
+  it('never throws for a hand-built Schedule whose fields have names but no values/terms', () => {
+    const real = sched('0 2 * * 1', 'vixie');
+    const malformed = { ...real, fields: real.fields.map((f) => ({ name: f.name })) } as unknown as Schedule;
+    expect(core.next(malformed, { from })).toEqual([]);
+    expect(core.prev(malformed, { from })).toEqual([]);
+    expect(core.matches(malformed, from)).toBe(false);
+  });
 });

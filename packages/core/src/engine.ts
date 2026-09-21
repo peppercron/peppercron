@@ -6,7 +6,12 @@ import type {
 } from './types';
 
 const HORIZON = 5 * 366 * 86400;
-/** How far before the start we look for a transition whose overlap or gap still affects the start. */
+/**
+ * Bounds how far the transitions search looks past both ends of [startSec, endSec]: backward, for a
+ * transition whose overlap or gap still affects the start; forward, for one that still affects the end
+ * (see the comment in walk() below). The forward side only needs to exceed the widest real gap/overlap,
+ * so the same 2-day constant covers both directions.
+ */
 const LOOKBACK = 2 * 86400;
 const DEFAULT_COUNT = 10;
 const MAX_COUNT = 1000;
@@ -104,6 +109,21 @@ function* walk(c: Compiled, spec: DialectSpec, tz: Tz, zone: string, startSec: n
   }
 }
 
+/**
+ * A hand-built Schedule can carry field names with no `values`/`terms` (compile() copies them through
+ * without checking); that only breaks once the matcher actually reads them mid-walk. Wrapping every
+ * consumption of walk() in this makes such a throw look like "no more runs" instead of escaping to the
+ * caller, keeping next/prev/matches' never-throw contract without weakening matcher.ts's assumption that
+ * a Compiled it's given is well-formed.
+ */
+function* guarded<T>(gen: Generator<T>): Generator<T> {
+  try {
+    yield* gen;
+  } catch {
+    // Treat a malformed schedule discovered mid-walk as having no further runs.
+  }
+}
+
 function toRun(r: RawRun): Run {
   const run: Run = { at: new Date(r.at * 1000), local: formatLocal(r.wall, r.offset) };
   if (r.dst) run.dst = r.dst;
@@ -155,7 +175,7 @@ export function createEngine(
 
     const count = clampCount(opts.count);
     const out: Run[] = [];
-    for (const r of walk(p.c, p.spec, tz, p.zone, start, end)) {
+    for (const r of guarded(walk(p.c, p.spec, tz, p.zone, start, end))) {
       out.push(toRun(r));
       if (out.length >= count) break;
     }
@@ -180,7 +200,7 @@ export function createEngine(
     const count = clampCount(opts.count);
     for (let span = 3600; ; span *= 4) {
       const start = Math.max(floor, end - span + 1);
-      const runs = [...walk(p.c, p.spec, tz, p.zone, start, end)];
+      const runs = [...guarded(walk(p.c, p.spec, tz, p.zone, start, end))];
       if (runs.length >= count || start === floor) return runs.slice(-count).reverse().map(toRun);
     }
   }
@@ -190,7 +210,7 @@ export function createEngine(
     const ms = toMs(at);
     if (!p || Number.isNaN(ms) || ms % 1000 !== 0) return false;
     const sec = ms / 1000;
-    for (const r of walk(p.c, p.spec, tz, p.zone, sec, sec)) return r.at === sec;
+    for (const r of guarded(walk(p.c, p.spec, tz, p.zone, sec, sec))) return r.at === sec;
     return false;
   }
 
