@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { matches, next, parse, prev } from '../src/index';
-import type { Dialect, Schedule } from '../src/types';
+import { intlTz, matches, next, parse, prev } from '../src/index';
+import type { Dialect, DstTag, Run, Schedule } from '../src/types';
 
 const RUNS = 150;
 
@@ -86,22 +86,47 @@ const cases: [Dialect, fc.Arbitrary<string>][] = [
   ['vixie', vixieExpr], ['kubernetes', kubernetesExpr], ['github-actions', githubExpr], ['quartz', quartzExpr], ['aws', awsExpr],
 ];
 
+/**
+ * Shared by the per-dialect property table below and the DST-focused block: next is ordered - equal
+ * instants allowed only straight after a DST catch-up run (DERIVATION H2) - and every run matches.
+ */
+function assertNextOrderedAndMatches(s: Schedule, start: Date, count: number): Run[] {
+  const runs = next(s, { from: start, count });
+  let last = start.getTime();
+  let afterCatchUp = false;
+  for (const run of runs) {
+    if (afterCatchUp) expect(run.at.getTime()).toBeGreaterThanOrEqual(last);
+    else expect(run.at.getTime()).toBeGreaterThan(last);
+    expect(matches(s, run.at)).toBe(true);
+    last = run.at.getTime();
+    afterCatchUp = run.dst === 'skipped-adjusted';
+  }
+  return runs;
+}
+
+/** prev from just after the last of `count` runs from `start` returns the same runs reversed. */
+function assertPrevMirrorsNext(s: Schedule, start: Date, count: number): void {
+  const firstBatch = next(s, { from: start, count });
+  if (firstBatch.length === 0) return;
+  // Re-query up to the last instant so a group of runs sharing that instant is never cut in half.
+  const lastAt = firstBatch[firstBatch.length - 1].at;
+  const runs = next(s, { from: start, until: lastAt, count: 1000 });
+  const back = prev(s, { from: new Date(lastAt.getTime() + 1000), count: runs.length });
+  expect(back).toEqual([...runs].reverse());
+}
+
+/** inclusive returns `start` itself exactly when `start` matches. */
+function assertInclusiveAgreesWithMatches(s: Schedule, start: Date): void {
+  const [first] = next(s, { from: start, count: 1, inclusive: true });
+  const hit = first !== undefined && first.at.getTime() === start.getTime();
+  expect(hit).toBe(matches(s, start));
+}
+
 describe.each(cases)('%s properties', (dialect, exprs) => {
   it('next is ordered, after from, and every run matches', () => {
     fc.assert(
       fc.property(exprs, zone, from, (expr, tz, start) => {
-        const s = schedule(expr, dialect, tz);
-        const runs = next(s, { from: start, count: 5 });
-        let last = start.getTime();
-        let afterCatchUp = false;
-        for (const run of runs) {
-          // Equal instants are allowed only straight after a DST catch-up run (DERIVATION H2).
-          if (afterCatchUp) expect(run.at.getTime()).toBeGreaterThanOrEqual(last);
-          else expect(run.at.getTime()).toBeGreaterThan(last);
-          expect(matches(s, run.at)).toBe(true);
-          last = run.at.getTime();
-          afterCatchUp = run.dst === 'skipped-adjusted';
-        }
+        assertNextOrderedAndMatches(schedule(expr, dialect, tz), start, 5);
       }),
       { numRuns: RUNS },
     );
@@ -110,14 +135,7 @@ describe.each(cases)('%s properties', (dialect, exprs) => {
   it('prev from just after the last run returns the same runs reversed', () => {
     fc.assert(
       fc.property(exprs, zone, from, (expr, tz, start) => {
-        const s = schedule(expr, dialect, tz);
-        const firstFive = next(s, { from: start, count: 5 });
-        if (firstFive.length === 0) return;
-        // Re-query up to the last instant so a group of runs sharing that instant is never cut in half.
-        const lastAt = firstFive[firstFive.length - 1].at;
-        const runs = next(s, { from: start, until: lastAt, count: 1000 });
-        const back = prev(s, { from: new Date(lastAt.getTime() + 1000), count: runs.length });
-        expect(back).toEqual([...runs].reverse());
+        assertPrevMirrorsNext(schedule(expr, dialect, tz), start, 5);
       }),
       { numRuns: RUNS },
     );
@@ -126,13 +144,174 @@ describe.each(cases)('%s properties', (dialect, exprs) => {
   it('inclusive returns from itself exactly when from matches', () => {
     fc.assert(
       fc.property(exprs, zone, from, (expr, tz, start) => {
-        const s = schedule(expr, dialect, tz);
-        const [first] = next(s, { from: start, count: 1, inclusive: true });
-        const hit = first !== undefined && first.at.getTime() === start.getTime();
-        expect(hit).toBe(matches(s, start));
+        assertInclusiveAgreesWithMatches(schedule(expr, dialect, tz), start);
       }),
       { numRuns: RUNS },
     );
+  });
+});
+
+/**
+ * Real 2026 DST transitions for zones already in `zone`, biasing generation toward the gap/overlap
+ * windows the `repeat` (kubernetes), `next-valid` (github-actions) and `once-first` (aws) strategies
+ * branch on - uniform random day-of-month/month/zone choices land on a transition far too rarely to
+ * exercise them (measured in the Task 7 review: an expected ~0.015 hits per full suite run for
+ * github-actions' catch-up path). Verified against the library's own transition finder
+ * (`intlTz.transitions`, run against the built `dist/index.js`, 2026-09-21):
+ *
+ *   America/New_York     gap     2026-03-08T07:00:00Z  (-18000 -> -14400, local 02:00 -> 03:00)
+ *   America/New_York     overlap 2026-11-01T06:00:00Z  (-14400 -> -18000, local 01:00 repeats)
+ *   Europe/London        gap     2026-03-29T01:00:00Z  (0 -> 3600, local 01:00 -> 02:00)
+ *   Europe/London        overlap 2026-10-25T01:00:00Z  (3600 -> 0, local 01:00 repeats)
+ *   Australia/Lord_Howe  gap     2026-10-03T15:30:00Z  (37800 -> 39600, a 30-minute shift, local 02:00 -> 02:30)
+ *   Australia/Lord_Howe  overlap 2026-04-04T15:00:00Z  (39600 -> 37800, local 01:30 repeats)
+ *   America/Havana       gap     2026-03-08T05:00:00Z  (-18000 -> -14400, local 00:00 -> 01:00, midnight transition)
+ *   America/Havana       overlap 2026-11-01T05:00:00Z  (-14400 -> -18000, local 00:00 repeats)
+ */
+const TRANSITIONS_2026: { zone: string; at: string; kind: 'gap' | 'overlap' }[] = [
+  { zone: 'America/New_York', at: '2026-03-08T07:00:00Z', kind: 'gap' },
+  { zone: 'America/New_York', at: '2026-11-01T06:00:00Z', kind: 'overlap' },
+  { zone: 'Europe/London', at: '2026-03-29T01:00:00Z', kind: 'gap' },
+  { zone: 'Europe/London', at: '2026-10-25T01:00:00Z', kind: 'overlap' },
+  { zone: 'Australia/Lord_Howe', at: '2026-10-03T15:30:00Z', kind: 'gap' },
+  { zone: 'Australia/Lord_Howe', at: '2026-04-04T15:00:00Z', kind: 'overlap' },
+  { zone: 'America/Havana', at: '2026-03-08T05:00:00Z', kind: 'gap' },
+  { zone: 'America/Havana', at: '2026-11-01T05:00:00Z', kind: 'overlap' },
+];
+
+// The transitions above all sit at local hour 0, 1 or 2 (Lord Howe's overlap starts at 01:30), so this
+// covers every one of them. Both fixed-time (no leading '*') and wildcard forms are included, because
+// vixie-window/next-valid/repeat treat them differently (DERIVATION H1; corpus/README.md dstGap/dstOverlap).
+const dstMinute = fc.constantFrom('0', '30', '15,45', '*', '*/20');
+const dstHour = fc.constantFrom('0', '1', '2', '3', '0-3', '*', '*/2');
+
+/** All-star day fields, in each dialect's own spelling, so only minute/hour drive the DST behaviour. */
+function dstExpr(dialect: Dialect, minute: string, hour: string, wrapAws: boolean): string {
+  switch (dialect) {
+    case 'quartz':
+      return `0 ${minute} ${hour} * * ?`;
+    case 'aws': {
+      const fields = `${minute} ${hour} * * ? *`;
+      return wrapAws ? `cron(${fields})` : fields;
+    }
+    default:
+      return `${minute} ${hour} * * *`;
+  }
+}
+
+interface DstCase {
+  dialect: Dialect;
+  expr: string;
+  zone: string;
+  kind: 'gap' | 'overlap';
+  from: Date;
+}
+
+/** One (dialect, expression, zone) landing near one of the verified transitions above, with `from`
+ *  between 1 minute and 6 hours before the transition instant. */
+function dstCaseFor(dialect: Dialect): fc.Arbitrary<DstCase> {
+  return fc
+    .tuple(fc.constantFrom(...TRANSITIONS_2026), dstMinute, dstHour, fc.boolean(), fc.integer({ min: 60, max: 21600 }))
+    .map(([t, minute, hour, wrapAws, secondsBefore]) => {
+      const transitionMs = Date.parse(t.at);
+      return {
+        dialect,
+        expr: dstExpr(dialect, minute, hour, wrapAws),
+        zone: t.zone,
+        kind: t.kind,
+        from: new Date(transitionMs - secondsBefore * 1000),
+      };
+    });
+}
+
+const DIALECTS: Dialect[] = ['vixie', 'kubernetes', 'github-actions', 'quartz', 'aws'];
+const dstCase: fc.Arbitrary<DstCase> = fc.constantFrom(...DIALECTS).chain(dstCaseFor);
+
+describe('DST-focused properties', () => {
+  it('next is ordered, after from, and every run matches, across a real transition', () => {
+    fc.assert(
+      fc.property(dstCase, (c) => {
+        assertNextOrderedAndMatches(schedule(c.expr, c.dialect, c.zone), c.from, 12);
+      }),
+      { numRuns: RUNS },
+    );
+  });
+
+  it('prev from just after the last run returns the same runs reversed, across a real transition', () => {
+    fc.assert(
+      fc.property(dstCase, (c) => {
+        assertPrevMirrorsNext(schedule(c.expr, c.dialect, c.zone), c.from, 12);
+      }),
+      { numRuns: RUNS },
+    );
+  });
+
+  it('inclusive returns from itself exactly when from matches, across a real transition', () => {
+    fc.assert(
+      fc.property(dstCase, (c) => {
+        assertInclusiveAgreesWithMatches(schedule(c.expr, c.dialect, c.zone), c.from);
+      }),
+      { numRuns: RUNS },
+    );
+  });
+
+  it("dst tags match each dialect's strategy (corpus/dialects/*.json dstGap/dstOverlap)", () => {
+    fc.assert(
+      fc.property(dstCase, (c) => {
+        const s = schedule(c.expr, c.dialect, c.zone);
+        const runs = next(s, { from: c.from, count: 12 });
+
+        for (const run of runs) {
+          // skip: kubernetes, quartz and aws never catch up a spring-forward gap.
+          if (c.dialect === 'kubernetes' || c.dialect === 'quartz' || c.dialect === 'aws') {
+            expect(run.dst).not.toBe('skipped-adjusted');
+          }
+          // once-second: quartz only ever fires on the second (standard-offset) pass of an overlap.
+          if (c.dialect === 'quartz') expect(run.dst).not.toBe('ambiguous-first');
+          // once-first: aws only ever fires on the first (pre-shift) pass of an overlap.
+          if (c.dialect === 'aws') expect(run.dst).not.toBe('ambiguous-second');
+          // `scheduled` is set exactly on a skipped-adjusted run (corpus/README.md, cases/next).
+          if (run.dst === 'skipped-adjusted') expect(run.scheduled).toBeDefined();
+          else expect(run.scheduled).toBeUndefined();
+        }
+
+        // next-valid: at most one catch-up run per gap, and it is never joined by another run at the
+        // same instant - the strategy suppresses itself when a natural run already lands there.
+        if (c.dialect === 'github-actions') {
+          const caughtUp = runs.filter((run) => run.dst === 'skipped-adjusted');
+          expect(caughtUp.length).toBeLessThanOrEqual(1);
+          if (caughtUp.length === 1) {
+            const at = caughtUp[0].at.getTime();
+            expect(runs.filter((run) => run.at.getTime() === at)).toHaveLength(1);
+          }
+        }
+      }),
+      { numRuns: RUNS },
+    );
+  });
+
+  // A seeded, deterministic sample per dialect, so a property passing above cannot silently mean the
+  // strategy it targets was never reached again (the Task 7 review's vacuity finding).
+  it('every dst tag each dialect can emit is actually observed in a fixed sample', () => {
+    const expected: Record<Dialect, DstTag[]> = {
+      vixie: ['skipped-adjusted', 'ambiguous-first', 'ambiguous-second'],
+      kubernetes: ['ambiguous-first', 'ambiguous-second'],
+      'github-actions': ['skipped-adjusted', 'ambiguous-first', 'ambiguous-second'],
+      quartz: ['ambiguous-second'],
+      aws: ['ambiguous-first'],
+    };
+
+    for (const dialect of DIALECTS) {
+      const seen = new Map<DstTag, number>();
+      for (const c of fc.sample(dstCaseFor(dialect), { numRuns: 400, seed: 20260921 })) {
+        const s = schedule(c.expr, c.dialect, c.zone);
+        for (const run of next(s, { from: c.from, count: 12 })) {
+          if (run.dst) seen.set(run.dst, (seen.get(run.dst) ?? 0) + 1);
+        }
+      }
+      for (const tag of expected[dialect]) expect(seen.get(tag) ?? 0).toBeGreaterThan(0);
+      console.info(`DST coverage ${dialect}:`, Object.fromEntries(seen));
+    }
   });
 });
 
@@ -169,6 +348,15 @@ describe('interval properties', () => {
         const a = next(schedule(expr, dialect, tzA), { anchor, from: start, count: 5 });
         const b = next(schedule(expr, dialect, tzB), { anchor, from: start, count: 5 });
         expect(a.map((r) => r.at.getTime())).toEqual(b.map((r) => r.at.getTime()));
+        // "nothing else" means local really does round-trip in both zones...
+        for (const run of [...a, ...b]) expect(new Date(run.local).getTime()).toBe(run.at.getTime());
+        // ...and "changes local" means it actually differs whenever the two zones' offsets differ at
+        // that instant (offsets read independently from the library's own transition finder, not from
+        // the `local` strings under test).
+        a.forEach((run, i) => {
+          const sec = Math.floor(run.at.getTime() / 1000);
+          if (intlTz.offsetAt(tzA, sec) !== intlTz.offsetAt(tzB, sec)) expect(run.local).not.toBe(b[i].local);
+        });
       }),
       { numRuns: RUNS },
     );
@@ -188,6 +376,29 @@ describe('interval properties', () => {
 });
 
 describe('never throws', () => {
+  // A schedule string this file's own generators would produce - the `ok` branch below is reached far
+  // too rarely (measured at 0.07% in the Task 7 review) without these, since a purely random string
+  // almost never happens to parse.
+  const validExprs = fc.oneof(
+    vixieExpr, kubernetesExpr, githubExpr, quartzExpr, awsExpr, intervalCase.map(([, expr]) => expr),
+  );
+
+  /** Delete, duplicate or replace one character, or append a token - a "near miss" of a valid expression. */
+  function mutate(s: string, op: number, pos: number, token: string): string {
+    if (s.length === 0) return token;
+    const i = pos % s.length;
+    switch (op % 4) {
+      case 0: return s.slice(0, i) + s.slice(i + 1);
+      case 1: return s.slice(0, i) + s[i] + s.slice(i);
+      case 2: return s.slice(0, i) + token + s.slice(i + 1);
+      default: return `${s}${token}`;
+    }
+  }
+
+  const mutatedValid = fc
+    .tuple(validExprs, fc.nat(3), fc.nat(), fc.constantFrom('(', ')', '@', '/', '-', ',', '?', '#', 'L', 'W', '*'))
+    .map(([expr, op, pos, token]) => mutate(expr, op, pos, token));
+
   const hostile = fc.oneof(
     fc.string(),
     fc.string().map((s) => `cron(${s}`),
@@ -195,6 +406,8 @@ describe('never throws', () => {
     fc.string().map((s) => `rate(${s})`),
     fc.string().map((s) => `@every ${s}`),
     fc.tuple(fc.string(), fc.string()).map(([a, b]) => `${a} cron(${b}) `),
+    validExprs,
+    mutatedValid,
   );
 
   it('parse, next, prev and matches accept any string', () => {
