@@ -1,0 +1,8 @@
+# Planning material: specs, designs and plans are never committed
+docs/
+/peppercron parser library*.md
+
+node_modules/
+dist/
+packages/core/src/generated/
+*.tsbuildinfo
