@@ -54,7 +54,7 @@ minute. This is the unit a runner steps by in the derived checks below.
 | `id` | `^[a-z][a-z-]*$` | Must equal the filename stem and be listed in `dialects/index.json`. |
 | `family` | a `family` strategy id | Which grammar parses the expression. Only `cron-fields` so far. |
 | `fields` | array, 5 or more | The dialect's fields **in the order they are written**. |
-| `macros` | `@name` to expansion | The expansion is a field string parsed as if typed (`"@daily": "0 0 1 1 *"`), or `null` for a macro that carries no schedule (`@reboot`). Keys match `^@[a-z]+$` and are matched case-sensitively. |
+| `macros` | `@name` to expansion | The expansion is a field string parsed as if typed (`"@daily": "0 0 * * *"`), or `null` for a macro that carries no schedule (`"@reboot": null`). Keys match `^@[a-z]+$` and are matched case-sensitively. |
 | `trailingCommand` | boolean | True: tokens past the last field become `Schedule.trailing` instead of a `field-count` error (a crontab line). False: extra tokens are an error. |
 | `rangeWrap` | `error` \| `empty` \| `wrap` | What `from > to` in a range means: a `bad-range` error; an empty set; or wrapping across the field's end. |
 | `singleStep` | `error` \| `to-max` | What a step after a single value (`5/15`) means: a `bad-step` error (cronie), or "5 through the field maximum, every 15" (Quartz, FreeBSD). |
@@ -72,7 +72,7 @@ Each entry of `fields`:
 | `min`, `max` | integers, inclusive | The accepted range, **in the dialect's own numbering**. A value outside it is `out-of-range`. |
 | `names` | `month` \| `dow` | Three-letter names are accepted here: `JAN`..`DEC`, or `SUN`..`SAT`. Matching is case-insensitive. |
 | `sundayIs` | `0` \| `1` | The number this dialect writes Sunday as, in `dayOfWeek`. Drives both name resolution and canonicalisation. Absent means 0. |
-| `tokens` | subset of `?` `L` `L-n` `W` `LW` `nL` `#` | The special tokens this field *supports*. A token that the grammar can parse but this list omits is **not** an error: it parses, the term gets `unsupported: true`, and the engine still evaluates it. That keeps the simulator useful on questionable input and gives a later lint pass its rule without re-parsing. |
+| `tokens` | subset of `?` `L` `L-n` `W` `LW` `nL` `#` | The special tokens this field *supports*. **An absent key means the empty set** - the field supports none of them - so it is not a shorthand for "all". No vixie field carries the key, which is why `L` in a vixie day-of-month is flagged. A token that the grammar can parse but this list omits is **not** an error: it parses, the term gets `unsupported: true`, and the engine still evaluates it. That keeps the simulator useful on questionable input and gives a later lint pass its rule without re-parsing. |
 | `optional` | boolean | This trailing field may be omitted (Quartz `year`). Fields before it are required. |
 
 Vixie's `dayOfWeek` runs `0-7` with `sundayIs: 0`, so Sunday is both `0` and `7`. Quartz's runs `1-7`
@@ -168,7 +168,9 @@ disagree.
   for a non-finite value. Case files are schema-bound to 1..1000, so the clamp never bites in a case.
 - **Horizon:** the search covers at most **5 * 366 days = 158,112,000 seconds** from `from`, in either
   direction. A schedule with no run in that span returns an empty list rather than searching forever.
-  A case whose `expect` is shorter than its `count` is asserting exactly that.
+  A case whose `expect` is shorter than its `count` is asserting that the runs stopped before `count`
+  was reached - because the schedule ran out within the horizon, **or** because an `until` closed the
+  window first. The two are not distinguishable from the case file alone; read its `until`.
 - **Order:** results are **non-decreasing**, not strictly increasing. Equal instants occur only in a
   group that begins with `skipped-adjusted` runs. Paging with `from: lastRun.at` and `count: 1` will
   silently drop the rest of such a group; ask for a full page and de-duplicate on `at` plus
@@ -187,6 +189,9 @@ disagree.
   "provenance": { "kind": "spec" }
 }
 ```
+
+That block shows every key a parse case may carry, so it is not a copy of the file: the real
+`vixie-weekly-explicit` in `cases/parse/basic.json` sets no `timezone` and so runs in UTC.
 
 `expect` is compared **in full** against the returned `Schedule`: `dialect`, `source` (the untouched
 input), `timezone`, every `Field` with its `raw`, `span`, `terms`, `values` and `star`, and the
@@ -238,6 +243,10 @@ will split a valid expression differently.
   "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H1, H2" }
 }
 ```
+
+That block likewise shows every optional key at once rather than copying the file: the real
+`vixie-gap-fixed-time-catches-up` in `cases/next/dst.json` sets no `until`, `notMatching` or
+`skipDerived`, and its `expect` holds three runs, of which only the first is shown here.
 
 Each entry of `expect` is a `Run`:
 
