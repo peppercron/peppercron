@@ -31,7 +31,6 @@
     "typecheck": "tsc --noEmit",
     "prebuild": "npm run gen",
     "build": "tsup",
-    "postbuild": "tsc --project tsconfig.build.json && node -e \"require('fs').copyFileSync('dist/index.d.ts','dist/index.d.cts')\"",
     "size": "node scripts/size.mjs"
   },
   "devDependencies": {
@@ -39,7 +38,7 @@
     "ajv": "^8.20.0",
     "fast-check": "^4.10.2",
     "tsup": "^8.5.1",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   }
 }
