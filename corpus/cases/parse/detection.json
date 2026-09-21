@@ -7,5 +7,17 @@
     "provenance": { "kind": "spec" } },
   { "id": "detect-unsupported-token-is-reported", "input": "0 0 L * *",
     "expectSummary": { "dialect": "vixie", "unsupported": ["dayOfMonth"] },
+    "provenance": { "kind": "spec" } },
+  { "id": "detect-plain-five-fields-lists-all-three", "input": "0 9 * * 1",
+    "expectSummary": { "dialect": "vixie", "candidates": ["vixie", "kubernetes", "github-actions"], "values": { "dayOfWeek": [1] } },
+    "provenance": { "kind": "spec" } },
+  { "id": "detect-sunday-seven-is-vixie-only", "input": "0 9 * * 7",
+    "expectSummary": { "dialect": "vixie", "values": { "dayOfWeek": [0] } },
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md K2, G1" } },
+  { "id": "detect-single-value-step-excludes-vixie", "input": "20/15 * * * *",
+    "expectSummary": { "dialect": "kubernetes", "candidates": ["kubernetes", "github-actions"], "values": { "minute": [20, 35, 50] } },
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H7, K4, G2" } },
+  { "id": "detect-crontab-line-is-vixie-only", "input": "0 2 * * * /usr/bin/backup",
+    "expectSummary": { "dialect": "vixie" },
     "provenance": { "kind": "spec" } }
 ]

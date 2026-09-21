@@ -40,10 +40,10 @@ describe('corpus data', () => {
 
 describe('dialects module', () => {
   it('exposes the generated data', () => {
-    expect(dialectOrder).toEqual(['vixie', 'kubernetes', 'quartz']);
+    expect(dialectOrder).toEqual(['vixie', 'kubernetes', 'github-actions', 'quartz']);
     expect(getDialect('quartz')?.fields).toHaveLength(7);
     expect(getDialect('vixie')?.macros['@reboot']).toBeNull();
-    expect(strategyIds.dstGap).toEqual(['skip', 'vixie-window']);
+    expect(strategyIds.dstGap).toEqual(['skip', 'vixie-window', 'next-valid']);
   });
 
   it('returns undefined for unknown ids, including Object.prototype keys', () => {

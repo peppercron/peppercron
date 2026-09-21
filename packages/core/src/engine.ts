@@ -48,6 +48,14 @@ export const DST_GAP: Record<string, GapStrategy> = {
   // cronie: fixed-time jobs run once per skipped matching minute, right after the jump (DERIVATION H2).
   'vixie-window': (c, gapStart, gapEnd) =>
     c.fixedTime && gapEnd - gapStart < MAX_CATCH_UP_GAP ? wallMatches(c, gapStart, gapEnd) : [],
+  // GitHub Actions: "scheduled workflows in skipped hours advance to the next valid time" (DERIVATION G5).
+  // One run per gap, for fixed-time schedules only, and none when a natural run already fires at that instant.
+  'next-valid': (c, gapStart, gapEnd) => {
+    if (!c.fixedTime) return [];
+    const skipped = nextWallMatch(c, gapStart, gapEnd);
+    if (skipped === null || nextWallMatch(c, gapEnd, gapEnd + 1) === gapEnd) return [];
+    return [skipped];
+  },
 };
 
 /** Strategy registry for the `dstOverlap` axis of corpus/strategies.json. */

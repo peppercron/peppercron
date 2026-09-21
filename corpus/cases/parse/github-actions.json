@@ -1,0 +1,23 @@
+[
+  { "id": "github-documented-step-after-a-value", "input": "20/15 * * * *", "options": { "dialect": "github-actions" },
+    "expectSummary": { "dialect": "github-actions", "values": { "minute": [20, 35, 50] } },
+    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md G2" } },
+  { "id": "github-documented-timezone-example", "input": "30 5 * * 1-5", "options": { "dialect": "github-actions", "timezone": "America/New_York" },
+    "expectSummary": { "dialect": "github-actions", "values": { "minute": [30], "hour": [5], "dayOfWeek": [1, 2, 3, 4, 5] } },
+    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md G5" } },
+  { "id": "github-names", "input": "0 0 1 JAN,JUL MON", "options": { "dialect": "github-actions" },
+    "expectSummary": { "dialect": "github-actions", "values": { "month": [1, 7], "dayOfWeek": [1] } },
+    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md G3" } },
+  { "id": "github-has-no-macros", "input": "@daily", "options": { "dialect": "github-actions" },
+    "expectError": { "code": "unknown-macro", "span": [0, 6] },
+    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md G4" } },
+  { "id": "github-sunday-seven-is-an-error", "input": "0 9 * * 7", "options": { "dialect": "github-actions" },
+    "expectError": { "code": "out-of-range", "span": [8, 9] },
+    "provenance": { "kind": "assumed", "source": "corpus/DERIVATION.md G1" } },
+  { "id": "github-reversed-range-is-an-error", "input": "0 0 * * SAT-SUN", "options": { "dialect": "github-actions" },
+    "expectError": { "code": "bad-range", "span": [8, 15] },
+    "provenance": { "kind": "assumed", "source": "corpus/DERIVATION.md G1" } },
+  { "id": "github-quartz-tokens-are-unsupported", "input": "0 0 L * ?", "options": { "dialect": "github-actions" },
+    "expectSummary": { "dialect": "github-actions", "unsupported": ["dayOfMonth", "dayOfWeek"] },
+    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md G10" } }
+]

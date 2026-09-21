@@ -1,4 +1,4 @@
-export type Dialect = 'vixie' | 'kubernetes' | 'quartz';
+export type Dialect = 'vixie' | 'kubernetes' | 'github-actions' | 'quartz';
 
 /** Character offsets [start, end) into Schedule.source. */
 export type Span = [number, number];

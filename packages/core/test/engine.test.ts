@@ -263,3 +263,42 @@ describe('kubernetes DST (DERIVATION K11-K13)', () => {
     ]);
   });
 });
+
+describe('github-actions DST: next-valid (DERIVATION G5)', () => {
+  const first = (expr: string, from: string, count: number) =>
+    core.next(sched(expr, 'github-actions', 'Test/NY'), { from: at(from), count });
+
+  it('advances a fixed-time run in a gap to the transition instant', () => {
+    expect(first('30 2 * * *', '2026-03-07T12:00:00Z', 2)).toEqual([
+      { at: at('2026-03-08T07:00:00Z'), local: '2026-03-08T03:00:00-04:00', dst: 'skipped-adjusted', scheduled: '2026-03-08T02:30:00' },
+      { at: at('2026-03-09T06:30:00Z'), local: '2026-03-09T02:30:00-04:00' },
+    ]);
+  });
+
+  it('advances once however many times the gap skipped', () => {
+    const runs = first('0,30 2 * * *', '2026-03-07T12:00:00Z', 2);
+    expect(runs.map((r) => [r.at.toISOString(), r.scheduled])).toEqual([
+      ['2026-03-08T07:00:00.000Z', '2026-03-08T02:00:00'],
+      ['2026-03-09T06:00:00.000Z', undefined],
+    ]);
+  });
+
+  it('adds nothing when a natural run already fires at the transition instant', () => {
+    const runs = first('0 2,3 * * *', '2026-03-07T12:00:00Z', 2);
+    expect(runs).toEqual([
+      { at: at('2026-03-08T07:00:00Z'), local: '2026-03-08T03:00:00-04:00' },
+      { at: at('2026-03-09T06:00:00Z'), local: '2026-03-09T02:00:00-04:00' },
+    ]);
+  });
+
+  it('does not advance a wildcard schedule', () => {
+    expect(isos(first('*/30 * * * *', '2026-03-08T06:00:00Z', 2))).toEqual(['2026-03-08T06:30:00.000Z', '2026-03-08T07:00:00.000Z']);
+    expect(first('*/30 * * * *', '2026-03-08T06:00:00Z', 2)[1].dst).toBeUndefined();
+  });
+
+  it('matches() agrees with next() at the transition instant', () => {
+    const s = sched('30 2 * * *', 'github-actions', 'Test/NY');
+    expect(core.matches(s, at('2026-03-08T07:00:00Z'))).toBe(true);
+    expect(core.matches(s, at('2026-03-08T07:30:00Z'))).toBe(false);
+  });
+});
