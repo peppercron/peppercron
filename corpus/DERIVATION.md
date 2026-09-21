@@ -590,7 +590,7 @@ every-minute job loses 60 firings that day (1380 runs instead of 1440). **[hand]
 
 ### K13. Fall-back overlap
 
-**Verdict:** for `America/New_York`, 2026-11-01 (`01:00 EDT -> 01:00 EST`, wall `01:00-01:59` occurs
+**Verdict:** for `America/New_York`, 2026-11-01 (`02:00 EDT -> 01:00 EST`, wall `01:00-01:59` occurs
 twice), **every matching wall time inside the repeated hour fires twice**, once at each offset, one
 absolute hour apart - for fixed-time, wildcard-hour and every-minute schedules alike; nothing is
 special-cased. **Kubernetes creates two distinct Jobs** for the pair.
