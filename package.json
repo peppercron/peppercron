@@ -2,7 +2,7 @@
   "name": "peppercron",
   "private": true,
   "workspaces": ["packages/*"],
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22.12" },
   "scripts": {
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
