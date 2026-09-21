@@ -1,4 +1,4 @@
-export type Dialect = 'vixie' | 'kubernetes' | 'github-actions' | 'quartz';
+export type Dialect = 'vixie' | 'kubernetes' | 'github-actions' | 'quartz' | 'aws';
 
 /** Character offsets [start, end) into Schedule.source. */
 export type Span = [number, number];
@@ -42,7 +42,7 @@ export interface Schedule {
 
 export type ParseErrorCode =
   | 'empty' | 'field-count' | 'bad-token' | 'out-of-range' | 'bad-step'
-  | 'bad-range' | 'unknown-macro' | 'unknown-dialect' | 'bad-timezone';
+  | 'bad-range' | 'unknown-macro' | 'unknown-dialect' | 'bad-timezone' | 'bad-wrapper';
 
 export interface ParseError {
   code: ParseErrorCode;

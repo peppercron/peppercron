@@ -39,7 +39,7 @@
         "additionalProperties": false,
         "required": ["code", "span"],
         "properties": {
-          "code": { "description": "Closed list. A code means no Term could be built; a token this dialect merely does not support is not an error (see tokens in dialect.schema.json).", "enum": ["empty", "field-count", "bad-token", "out-of-range", "bad-step", "bad-range", "unknown-macro", "unknown-dialect", "bad-timezone"] },
+          "code": { "description": "Closed list. A code means no Term could be built; a token this dialect merely does not support is not an error (see tokens in dialect.schema.json).", "enum": ["empty", "field-count", "bad-token", "out-of-range", "bad-step", "bad-range", "unknown-macro", "unknown-dialect", "bad-timezone", "bad-wrapper"] },
           "span": { "description": "[start, end) character offsets into `input`, as UTF-16 code units. A port whose strings are bytes or code points must convert.", "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }
         }
       },

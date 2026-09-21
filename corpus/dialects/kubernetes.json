@@ -18,6 +18,7 @@
     "@hourly": "0 * * * *"
   },
   "trailingCommand": false,
+  "wrapper": null,
   "rangeWrap": "error",
   "singleStep": "to-max",
   "star": "unstepped-term",

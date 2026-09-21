@@ -66,6 +66,8 @@ export const DST_OVERLAP: Record<string, OverlapStrategy> = {
   'vixie-window': (c, pass) => pass === 'first' || !c.fixedTime,
   // robfig/cron reads only the wall clock, so both passes match; Kubernetes really creates two Jobs (DERIVATION K13).
   repeat: () => true,
+  // EventBridge Scheduler: "runs the schedule only once ... before the shift occurs" (DERIVATION A15).
+  'once-first': (_c, pass) => pass === 'first',
 };
 
 interface RawRun {

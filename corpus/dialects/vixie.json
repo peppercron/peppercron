@@ -19,6 +19,7 @@
     "@reboot": null
   },
   "trailingCommand": true,
+  "wrapper": null,
   "rangeWrap": "empty",
   "singleStep": "error",
   "star": "leading",

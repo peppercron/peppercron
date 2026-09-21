@@ -2,6 +2,7 @@ import { dialectOrder, getDialect, type DialectSpec } from '../dialects';
 import { fail, ok } from '../result';
 import type { Field, ParseError, ParseOptions, Result, Schedule, Span, Tz } from '../types';
 import { parseField } from './field';
+import { claims, region, unwrap } from './forms';
 import { tokenize, type Token } from './tokenize';
 
 export type FamilyParser = (
@@ -64,17 +65,22 @@ export const FAMILIES: Record<string, FamilyParser> = {
   'cron-fields': parseCronFields,
 };
 
-function parseAs(spec: DialectSpec, source: string, tokens: Token[], timezone: string): Result<Schedule, ParseError> {
+function parseAs(spec: DialectSpec, source: string, timezone: string): Result<Schedule, ParseError> {
   const family = FAMILIES[spec.family];
-  return family
-    ? family(spec, source, tokens, timezone)
-    : fail('unknown-dialect', `No parser for dialect family "${spec.family}"`, [0, 0]);
+  if (!family) return fail('unknown-dialect', `No parser for dialect family "${spec.family}"`, [0, 0]);
+  const text = unwrap(spec, source);
+  if (!text.ok) return text;
+  const tokens = tokenize(text.value);
+  if (tokens.length === 0) return fail('field-count', `${spec.id} found no fields inside the wrapper`, region(source));
+  return family(spec, source, tokens, timezone);
 }
 
 const hasUnsupported = (s: Schedule) => s.fields.some((f) => f.terms.some((t) => t.unsupported));
 
-function detect(source: string, tokens: Token[], timezone: string): Result<Schedule, ParseError> {
-  const attempts = dialectOrder.map((id) => parseAs(getDialect(id)!, source, tokens, timezone));
+function detect(source: string, timezone: string): Result<Schedule, ParseError> {
+  // A form only some dialects have (cron(...)) is theirs alone, so its errors are theirs too.
+  const claimed = dialectOrder.filter((id) => claims(getDialect(id)!, source));
+  const attempts = (claimed.length > 0 ? claimed : dialectOrder).map((id) => parseAs(getDialect(id)!, source, timezone));
   const parsed = attempts.flatMap((r) => (r.ok ? [r.value] : []));
   const clean = parsed.filter((s) => !hasUnsupported(s));
   const tidy = clean.filter((s) => !s.trailing);
@@ -97,10 +103,10 @@ export function createParser(tz: Tz) {
     const timezone = o.timezone ?? 'UTC';
     if (!tz.isValid(timezone)) return fail('bad-timezone', `Unknown timezone "${timezone}"`, [0, 0]);
 
-    if (o.dialect === undefined) return detect(input, tokens, timezone);
+    if (o.dialect === undefined) return detect(input, timezone);
 
     const spec = getDialect(o.dialect);
     if (!spec) return fail('unknown-dialect', `Unknown dialect "${String(o.dialect)}"`, [0, 0]);
-    return parseAs(spec, input, tokens, timezone);
+    return parseAs(spec, input, timezone);
   };
 }

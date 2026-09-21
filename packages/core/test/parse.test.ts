@@ -17,7 +17,7 @@ describe('parse: detection', () => {
   });
 
   it('prefers a dialect that needs no trailing text, and reports no candidates when only one fits', () => {
-    const s = value('* * * * * *');
+    const s = value('* * * * * MON');
     expect(s.dialect).toBe('quartz');
     expect(s.trailing).toBeUndefined();
     expect(s.candidates).toBeUndefined();
@@ -71,5 +71,33 @@ describe('parse: fields', () => {
   it('rejects an unknown dialect id without throwing', () => {
     const r = parse('0 2 * * 1', { dialect: 'constructor' as never });
     expect(r.ok ? null : r.error.code).toBe('unknown-dialect');
+  });
+});
+
+describe('parse: claimed forms (Review Focus 1 and 4)', () => {
+  it('detects a wrapped expression as aws and keeps spans on the untouched input', () => {
+    const s = value(' cron( 0 12 * * ? 2030 ) ');
+    expect(s.dialect).toBe('aws');
+    expect(s.candidates).toBeUndefined();
+    expect(s.source).toBe(' cron( 0 12 * * ? 2030 ) ');
+    expect(s.fields.map((f) => f.span)).toEqual([[7, 8], [9, 11], [12, 13], [14, 15], [16, 17], [18, 22]]);
+  });
+
+  it('reports the claiming dialect\'s error, not the first dialect\'s', () => {
+    const r = parse('cron(0 25 * * ? *)');
+    expect(r).toEqual({ ok: false, error: { code: 'out-of-range', message: '25 is outside 0-23 for hour', span: [7, 9] } });
+  });
+
+  it('lists both dialects when six plain fields fit quartz and aws', () => {
+    const s = value('* * * * * *');
+    expect(s.dialect).toBe('quartz');
+    expect(s.candidates).toEqual(['quartz', 'aws']);
+  });
+
+  it('never throws on malformed wrappers', () => {
+    for (const input of ['cron(', 'cron()', 'cron( )', 'cron(((', ')cron(', 'CRON(0 12 * * ? *)', 'cron(0 12 * * ? *) extra', 'cron(0 12 * * ? *))']) {
+      expect(() => parse(input), input).not.toThrow();
+      expect(parse(input).ok, input).toBe(false);
+    }
   });
 });

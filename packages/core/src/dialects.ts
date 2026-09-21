@@ -20,6 +20,8 @@ export interface DialectSpec {
   /** Macro name to its field expansion; null means a macro with no schedule. */
   macros: Record<string, string | null>;
   trailingCommand: boolean;
+  /** A keyword the expression may be written inside, as in `cron(...)`; the bare fields parse too. */
+  wrapper: string | null;
   rangeWrap: 'error' | 'empty' | 'wrap';
   /** What `5/15` means: a parse error (cronie), or 5 through the field maximum every 15 (Quartz). */
   singleStep: 'error' | 'to-max';

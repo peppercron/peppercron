@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "family", "fields", "macros", "trailingCommand", "rangeWrap", "singleStep", "star", "domDow", "dstGap", "dstOverlap", "missedRuns", "defaultTimezone"],
+  "required": ["id", "family", "fields", "macros", "trailingCommand", "wrapper", "rangeWrap", "singleStep", "star", "domDow", "dstGap", "dstOverlap", "missedRuns", "defaultTimezone"],
   "properties": {
     "id": { "description": "Must equal the filename stem and appear in dialects/index.json.", "type": "string", "pattern": "^[a-z][a-z-]*$" },
     "family": { "description": "A family strategy id from strategies.json.", "type": "string" },
@@ -32,13 +32,14 @@
       "additionalProperties": { "type": ["string", "null"] }
     },
     "trailingCommand": { "description": "True: tokens past the last field become Schedule.trailing (a crontab line). False: extra tokens are a field-count error.", "type": "boolean" },
+    "wrapper": { "description": "A wrapper keyword this dialect's expressions may be written inside, as in cron(...), or null. The bare fields are accepted too. It is matched case-sensitively and is blanked out before tokenizing, so spans still index the untouched input.", "type": ["string", "null"], "pattern": "^[a-z]+$" },
     "rangeWrap": { "description": "What a range whose start is after its end means: a bad-range error, an empty set, or wrapping across the field boundary.", "enum": ["error", "empty", "wrap"] },
     "singleStep": { "description": "What a step after a single value (5/15) means: a bad-step error, or 5 through the field maximum every 15.", "enum": ["error", "to-max"] },
     "star": { "description": "A star strategy id from strategies.json.", "type": "string" },
     "domDow": { "description": "A domDow strategy id from strategies.json.", "type": "string" },
     "dstGap": { "description": "A dstGap strategy id from strategies.json.", "type": "string" },
     "dstOverlap": { "description": "A dstOverlap strategy id from strategies.json.", "type": "string" },
-    "missedRuns": { "description": "What the reference implementation does with runs missed while it was not running. Recorded for later work; the engine does not read it.", "enum": ["none", "misfire-policy", "starting-deadline", "best-effort"] },
+    "missedRuns": { "description": "What the reference implementation does with runs missed while it was not running. Recorded for later work; the engine does not read it.", "enum": ["none", "misfire-policy", "starting-deadline", "best-effort", "flexible-window"] },
     "defaultTimezone": { "description": "What the reference implementation assumes when its user names no zone. A fact about the dialect, not about this library: parse here defaults to UTC and a Schedule always carries an explicit zone.", "enum": ["host", "utc"] }
   }
 }

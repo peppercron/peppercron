@@ -302,3 +302,20 @@ describe('github-actions DST: next-valid (DERIVATION G5)', () => {
     expect(core.matches(s, at('2026-03-08T07:30:00Z'))).toBe(false);
   });
 });
+
+describe('aws DST (DERIVATION A14, A15)', () => {
+  it('skips a run that falls in a gap', () => {
+    const runs = core.next(sched('cron(30 2 * * ? *)', 'aws', 'Test/NY'), { from: at('2026-03-07T12:00:00Z'), count: 1 });
+    expect(isos(runs)).toEqual(['2026-03-09T06:30:00.000Z']);
+  });
+
+  it('fires once in an overlap, on the first pass', () => {
+    const s = sched('cron(30 1 * * ? *)', 'aws', 'Test/NY');
+    const runs = core.next(s, { from: at('2026-10-31T12:00:00Z'), count: 2 });
+    expect(runs.map((r) => [r.at.toISOString(), r.dst])).toEqual([
+      ['2026-11-01T05:30:00.000Z', 'ambiguous-first'],
+      ['2026-11-02T06:30:00.000Z', undefined],
+    ]);
+    expect(core.matches(s, at('2026-11-01T06:30:00Z'))).toBe(false);
+  });
+});
