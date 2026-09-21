@@ -19,5 +19,5 @@
     "provenance": { "kind": "assumed", "source": "corpus/DERIVATION.md G1" } },
   { "id": "github-quartz-tokens-are-unsupported", "input": "0 0 L * ?", "options": { "dialect": "github-actions" },
     "expectSummary": { "dialect": "github-actions", "unsupported": ["dayOfMonth", "dayOfWeek"] },
-    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md G10" } }
+    "provenance": { "kind": "assumed", "source": "corpus/DERIVATION.md G10" } }
 ]

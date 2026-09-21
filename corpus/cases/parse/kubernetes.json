@@ -31,7 +31,7 @@
     "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md K2" } },
   { "id": "detect-question-mark-in-five-fields-is-kubernetes", "input": "0 0 ? * 1",
     "expectSummary": { "dialect": "kubernetes" },
-    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md K3" } },
+    "provenance": { "kind": "assumed", "source": "corpus/DERIVATION.md K3, G10" } },
   { "id": "detect-reboot-is-vixie-only", "input": "@reboot",
     "expectSummary": { "dialect": "vixie" },
     "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md K6" } }

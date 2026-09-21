@@ -1,7 +1,7 @@
 [
   { "id": "detect-weekend-range-is-vixie-only", "input": "0 10 * * SAT-SUN",
     "expectSummary": { "dialect": "vixie", "values": { "dayOfWeek": [0, 6] } },
-    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H3" } },
+    "provenance": { "kind": "assumed", "source": "corpus/DERIVATION.md H3, K5, G1" } },
   { "id": "detect-quartz-by-question-mark-position", "input": "0 0 12 ? * MON",
     "expectSummary": { "dialect": "quartz", "values": { "hour": [12], "dayOfWeek": [1] }, "star": { "month": true, "dayOfMonth": false } },
     "provenance": { "kind": "spec" } },
@@ -13,7 +13,7 @@
     "provenance": { "kind": "spec" } },
   { "id": "detect-sunday-seven-is-vixie-only", "input": "0 9 * * 7",
     "expectSummary": { "dialect": "vixie", "values": { "dayOfWeek": [0] } },
-    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md K2, G1" } },
+    "provenance": { "kind": "assumed", "source": "corpus/DERIVATION.md K2, G1" } },
   { "id": "detect-single-value-step-excludes-vixie", "input": "20/15 * * * *",
     "expectSummary": { "dialect": "kubernetes", "candidates": ["kubernetes", "github-actions"], "values": { "minute": [20, 35, 50] } },
     "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H7, K4, G2" } },

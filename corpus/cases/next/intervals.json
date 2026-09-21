@@ -42,5 +42,12 @@
       { "at": "2026-09-21T00:01:00Z", "local": "2026-09-21T00:01:00+00:00" },
       { "at": "2026-09-21T00:02:00Z", "local": "2026-09-21T00:02:00+00:00" }
     ],
-    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md A9" } }
+    "provenance": { "kind": "spec", "source": "corpus/DERIVATION.md A9" } },
+  { "id": "aws-rate-until-is-inclusive", "dialect": "aws", "input": "rate(5 minutes)", "timezone": "UTC",
+    "anchor": "2026-09-21T10:00:00Z", "from": "2026-09-21T10:00:00Z", "until": "2026-09-21T10:10:00Z", "count": 10,
+    "expect": [
+      { "at": "2026-09-21T10:05:00Z", "local": "2026-09-21T10:05:00+00:00" },
+      { "at": "2026-09-21T10:10:00Z", "local": "2026-09-21T10:10:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" } }
 ]

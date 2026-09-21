@@ -213,17 +213,22 @@ runs are in "Run-time semantics" further down. `none` marks a dialect with no in
 
 - **`go-duration`** (`@every <duration>`, Kubernetes/robfig) - `@every`, one or more whitespace
   characters, then **one whitespace-free token**, read as Go's `time.ParseDuration`:
-  `[-+]?(\d*(\.\d*)?(ns|us|µs|μs|ms|s|m|h))+`, or a bare `0`. The optional sign applies to the **whole**
+  `[-+]?(\d*(\.\d*)?(ns|us|µs|μs|ms|s|m|h))+`, or a bare `0`. Read literally that regex also accepts a
+  unit with no digit on either side of the point (`h`, `.s`); it does not - as in Go, every piece needs
+  at least one digit, before or after the point, so `@every h` and `@every .s` are both `bad-interval`.
+  The optional sign applies to the **whole**
   duration and may appear only at the front - `-1h30m` is legal, `1h-30m` is not (the second `-` is
   swallowed into what should be the `h` unit and fails to match any unit name). A second token
   (`@every 1h 30m`) is also `bad-interval`, not "two durations added together". There is no day or week
   unit. Each unit term contributes `intPart * unitNs` plus, for a fractional part, `floor(float64(fraction)
   * (unitNs / 10^digits))` - Go computes the fractional nanoseconds as a `float64` multiplication,
-  truncated, not as exact decimal arithmetic, and this is mirrored exactly (not simplified to an
-  equivalent-looking integer computation) because the two can disagree by a nanosecond near a rounding
-  boundary. Terms accumulate in order; the running total must stay **below 2^63 nanoseconds** (Go's
-  `int64` duration range) after every term or the whole thing is `bad-interval`. Once total nanoseconds
-  are known: a duration under 1 second is clamped **up** to 1 second, then the result is truncated
+  truncated, not as exact decimal arithmetic, and this per-term computation matches Go's own (not
+  simplified to an equivalent-looking integer computation) because the two can disagree by a nanosecond
+  near a rounding boundary. Terms accumulate in order, as an ordinary JavaScript number rather than a
+  64-bit integer (see Known deviations for where that can disagree with Go); the running total must stay
+  **below 2^63 nanoseconds** (Go's `int64` duration range) after every term or the whole thing is
+  `bad-interval`. Once total nanoseconds are known: a duration under 1 second is clamped **up** to 1
+  second, then the result is truncated
   **down** to whole seconds (`@every 1500ms` -> 1s, not 2s; `@every -1h` -> 1s, since a negative delay is
   also clamped up). **Spans:** `@every` with no duration, or with more than one token, is `bad-interval`
   spanning the **whole trimmed input**; a single token `time.ParseDuration` cannot read is `bad-interval`
@@ -316,6 +321,12 @@ Both `wrapper` and every interval strategy's keyword (`@every`, `rate`) are matc
 and fall straight through to field parsing (where they typically fail some other way - `CRON(...)` as
 an out-of-range or bad-token first field, for instance).
 
+Trimming, and every other mention of whitespace above (left-trimming before the interval claim test,
+the trimmed input the wrapper and the `family` parser both see), use the same whitespace set as
+Tokenizing: JavaScript's `\s`, which includes U+FEFF. Go's `strings.TrimSpace` does not strip U+FEFF,
+so a port must use the listed set, not its own language's idea of whitespace, or it will disagree on
+an input like `"﻿cron(0 12 * * ? *)"`.
+
 **Claimed-form detection.** A dialect *claims* an input when step 1 or step 2 above would apply to it
 for that dialect: its own interval strategy claims the text, or the text is wrapped in its own
 `wrapper` keyword. When `options.dialect` is omitted, if **any** dialect in `dialects/index.json` claims
@@ -373,7 +384,9 @@ compare only the field names they list, by exact value, ignoring every other fie
 `expectError` is `{ "code", "span" }`. The codes are a closed list: `empty`, `field-count`,
 `bad-token`, `out-of-range`, `bad-step`, `bad-range`, `unknown-macro`, `unknown-dialect`,
 `bad-timezone`, `bad-wrapper`, `bad-interval`. Parsing never throws and never returns a partial
-schedule.
+schedule. An input that is not a string (`null`, `undefined`, a number, a plain object, an array, ...)
+is reported as `empty` with span `[0, 0]`, the same code an empty string gets; a port written in a
+statically typed language has no such input and need not model it.
 
 **Detection** (`options.dialect` omitted) first narrows to the claiming dialects if any dialect claims
 the input (see Forms above); within that pool (or the full `dialects/index.json` order if none claims
@@ -491,7 +504,10 @@ Every behaviour pinned only by an `assumed` case, in one place. Found by searchi
 1. **G1 - `7` as Sunday, and a reversed range, in GitHub Actions.** GitHub's docs give the field ranges
    (`0-6` for day-of-week) but never say whether `7` is also accepted, and never mention reversed ranges
    at all. Assumed both are errors. Cases: `github-sunday-seven-is-an-error`,
-   `github-reversed-range-is-an-error`.
+   `github-reversed-range-is-an-error`. Two detection cases inherit this assumption, because "GitHub
+   does not accept this input" is part of why the other dialect wins: `detect-sunday-seven-is-vixie-only`
+   and `detect-weekend-range-is-vixie-only` (the latter also cites H3 and K5 for the vixie/Kubernetes
+   side of the comparison).
 2. **G5 (gap) - which schedules GitHub Actions advances out of a spring-forward gap.** GitHub documents
    only a single fixed-time example (`2:30 -> 3:00`). Assumed only a fixed-time schedule advances, one
    run per gap, none when a natural run already exists at the transition instant, and a wildcard
@@ -502,23 +518,40 @@ Every behaviour pinned only by an `assumed` case, in one place. Found by searchi
    nothing about the overlap. Assumed cronie's rule: a fixed-time schedule fires on the first pass only,
    a wildcard schedule fires on both (strategy `vixie-window`). Cases:
    `github-overlap-fixed-time-runs-once-on-the-first-pass`, `github-overlap-wildcard-runs-on-both-passes`.
-4. **A2 - whether AWS accepts `0` for Sunday.** AWS's docs establish `1` = Sunday only by example (never
+4. **G10 - `?`, `L`, `W`, `#` and a seconds field in GitHub Actions.** GitHub's docs are silent on all
+   five - neither documented nor explicitly rejected. Assumed unsupported: such a term parses but is
+   flagged `unsupported: true` rather than rejected outright. Case:
+   `github-quartz-tokens-are-unsupported`. One detection case inherits this assumption, because "GitHub
+   flags `?`" is part of why Kubernetes wins: `detect-question-mark-in-five-fields-is-kubernetes` (which
+   also cites K3 for the Kubernetes side).
+5. **A2 - whether AWS accepts `0` for Sunday.** AWS's docs establish `1` = Sunday only by example (never
    in prose) and never say whether `0` is also accepted the way it names `7` as an alternate Saturday.
-   Assumed `0` is `out-of-range`. Case: `aws-zero-is-not-a-day-of-week`.
-5. **A5 - `*/n` in AWS.** AWS's docs document only the `first/step` form (`1/10`); `*/n` never appears
+   Assumed `0` is `out-of-range`, and that day-of-week names are case-insensitive. `7` = Saturday is
+   **not** part of this assumption - it follows from the documented `1-7` range together with the `#`
+   example's "3 refers to Tuesday" (so `1` = Sunday ... `7` = Saturday), which is deducible from
+   documented text rather than a choice this corpus made. Case: `aws-zero-is-not-a-day-of-week`.
+6. **A4 - `LW`, `L-n` and multi-`#` in AWS.** AWS's docs document `L`, `nW`, `nL` and `n#m`, but are
+   silent on `LW`, `L-n` and any multi-`#` form. Assumed unsupported: such a term parses but is flagged
+   `unsupported: true` rather than rejected outright. Case:
+   `aws-undocumented-quartz-tokens-are-unsupported`.
+7. **A5 - `*/n` in AWS.** AWS's docs document only the `first/step` form (`1/10`); `*/n` never appears
    in either doc. Assumed `*/n` is legal, with the same meaning as `min/n`. Case:
    `aws-star-slash-step-is-allowed`.
-6. **A10 - when an AWS rate schedule first fires.** AWS's docs say a rate schedule "starts when you
+8. **A9 - upper bound on an AWS rate's `value`.** AWS's docs give no upper bound for `value` in
+   `rate(value unit)`. Assumed the resulting `seconds` must be a JavaScript safe integer (beyond
+   2^53 - 1 seconds is `bad-interval`) - this library's own safe-integer limit, not a fact read off
+   AWS. Case: `aws-rate-value-too-large`.
+9. **A10 - when an AWS rate schedule first fires.** AWS's docs say a rate schedule "starts when you
    create" the rule and "starts invoking ... immediately", without saying whether the very first
    invocation is at the anchor instant or one interval after it. Assumed at-anchor: the first run is the
    anchor instant itself (`intervalFirst: "at-anchor"`). Case: `aws-rate-first-run-is-the-anchor`.
-7. **A13 - AWS's default time zone.** The `ScheduleExpressionTimezone`/`ScheduleExpressionTimeZone`
+10. **A13 - AWS's default time zone.** The `ScheduleExpressionTimezone`/`ScheduleExpressionTimeZone`
    parameter is documented as optional with no default value stated. Assumed UTC
    (`defaultTimezone: "utc"`). No case rests on this one: it is a fact about the *reference* platform's
    own default, recorded on the dialect for a future port to reproduce; this library's own `parse`
    always defaults every dialect's `timezone` to UTC regardless, so nothing here distinguishes AWS's
    assumed default from any other dialect's.
-8. **A16 - whether AWS's DST rule is fixed-time-only.** The DST section's only worked example is a
+11. **A16 - whether AWS's DST rule is fixed-time-only.** The DST section's only worked example is a
    single fixed-time schedule; there is no wildcard example for either the gap or the overlap. Assumed
    the documented fixed-time rule applies to every schedule alike - skip a wall time in a gap, fire once
    on the first pass of an overlap (strategy `once-first`, and `dstGap: "skip"` needs no schedule-shape
@@ -581,3 +614,32 @@ not the reference, and should carry this list forward.
     line-by-line transcription of the same source (`[sim]`) - no Go toolchain ran the real library. The
     two DST sections (K11-K13) are called out there as the ones most in need of a real-build
     re-verification before this corpus is trusted at face value for Kubernetes.
+12. **robfig accepts a schedule this corpus refuses outright.** robfig's comma split drops empty runs,
+    so an empty list item and a trailing comma both parse (`1,,2` -> `{1,2}`, a trailing comma is
+    accepted), and, because its only field-position check is on the first comma-separated term, `*-5`
+    and `?-5` both parse as a plain `*` with the text after the hyphen silently discarded (K3, K9). Here
+    all four are `bad-token` (`parse('1,,2 * * * *', {dialect:'kubernetes'})` -> `bad-token [2,2]`), so a
+    schedule Kubernetes/robfig admits is refused here.
+13. **robfig requires exactly `"@every "` before the duration; this corpus is tolerant of whitespace
+    around and inside it.** robfig's descriptor `switch` matches `"@every "` (a single space) as a
+    literal prefix, so anything else there - no space, two spaces, a tab, a leading space before `@every`
+    itself - falls through to `unrecognized descriptor` or the five-field parser instead. Here `@every`
+    accepts one or more of the same whitespace characters listed under Tokenizing both before the
+    duration and around the whole macro (`@every  5m`, `@every\t5m`, `@every 5m`, ` @every 5m` and
+    `@every 5m ` all parse to the same 300-second interval).
+14. **AWS requires the `cron(...)` wrapper at the API level; this corpus also accepts the bare six
+    fields.** Every documented example wraps the expression, and the wrapper "is required at the API
+    level" (A6); the bare-fields form here (`aws-bare-fields-parse-too`) is this library's own leniency,
+    not AWS behaviour - it is `spec` provenance with no `source`, because it pins a choice this library
+    made, not a fact read off AWS's documentation.
+15. **AWS's treatment of a leading zero in a `rate()` value is undocumented; this corpus accepts it.**
+    Neither AWS doc discusses leading zeros in `rate(value unit)`'s `value`; `rate(05 minutes)` and
+    `rate(01 minute)` both parse here (as 300 and 60 seconds respectively) rather than being rejected as
+    malformed.
+16. **`go-duration`'s running total is a JavaScript number, not Go's `int64`.** The reference accumulates
+    a duration's nanoseconds in ordinary float64 arithmetic; Go accumulates in 64-bit integer nanoseconds.
+    Both agree everywhere a real schedule would land, but they can differ: for a duration longer than
+    about 104 days (2^53 ns) that carries odd nanoseconds, for a fractional part written with hundreds of
+    digits, and within a few thousand nanoseconds of the 2^63 - 1 limit, where float64 can no longer
+    represent every integer exactly. No corpus case pins behaviour in that range; a port should follow Go
+    (accumulate as a 64-bit integer), not this reference implementation.

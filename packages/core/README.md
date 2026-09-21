@@ -6,7 +6,7 @@ Parse cron schedules and compute when they run, correctly across timezones and D
 - Never throws. `parse` returns a result; `next`, `prev` and `matches` return `[]` or `false` for input they cannot use.
 - DST behaviour follows what each scheduler really does: derived from the cronie, Quartz and robfig/cron source where there is one, and from GitHub's and AWS's own documentation where there is not - with every remaining gap written down as an explicit assumption rather than a guess (see the corpus [Assumptions list](../../corpus/README.md#assumptions)).
 - Every parsed field and term carries its character span in the source, for editors and error underlines.
-- About 7 KB gzipped.
+- Under 8 KB gzipped.
 
 Five dialects are supported. `describe`, `lint` and `convert` are planned.
 
@@ -134,7 +134,7 @@ if (k.ok) {
 }
 ```
 
-`matches` has no `from` to default the anchor to, so without one it is always `false`. `prev` *does* default it to `from`, which makes it degenerate there: every run of the sequence is at or after the anchor, so `prev` on an interval schedule with no anchor returns `[]` - except an `at-anchor` dialect (AWS) with `inclusive: true`, which returns the anchor instant itself, since that one run is not strictly before `from`. Pass a real anchor to either when you mean it.
+`matches` has no `from` to default the anchor to, so without one it is always `false`. `prev` *does* default it to `from`, and since the anchor floors to a whole second, what that gives you depends on the dialect and on `from` itself. An `after-anchor` dialect (Kubernetes) always returns `[]` here: even its first run sits strictly after the anchor, so nothing can be strictly before a `from` that equals it. An `at-anchor` dialect (AWS) returns `[]` only when `from` is itself a whole second and `inclusive` is not set, so the floored anchor equals `from` exactly and `prev`'s strictly-before test excludes it; for any other `from` - in particular the default `from: new Date()`, which almost always carries milliseconds - or with `inclusive: true`, it returns the single run at the floored anchor, since that instant is at or before `from`. Pass a real anchor to either when you mean it.
 
 Kubernetes and AWS disagree on which run is first. Kubernetes's `@every` fires one interval *after* the anchor; AWS's `rate(...)` fires *at* the anchor itself:
 

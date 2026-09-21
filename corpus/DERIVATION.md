@@ -773,6 +773,9 @@ Inferred unsupported, since the field diagram shows only the 5 standard POSIX-st
 **Evidence:** pages checked: events-that-trigger-workflows, workflow-syntax-for-github-actions -
 neither page contains the strings "second", "`?`", "`L`", "`W`" or "`#`" in a schedule-syntax context.
 
+**Assumption:** `?`, `L`, `W`, `#` and a seconds field are unsupported in `github-actions`, so a term
+using one of them parses but is flagged `unsupported: true` rather than rejected outright.
+
 ### G11. POSIX spec itself
 
 **Verdict:** confirmed - the base POSIX crontab spec defines the 5-field ranges GitHub's table
@@ -818,8 +821,10 @@ of that type within the month" (the `#` example, establishing 3=Tuesday, hence 1
 https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html). Pages checked: the
 above two.
 
-**Assumption:** `0` is out of range (an error), `7` is Saturday, and day-of-week names are
-case-insensitive.
+**Assumption:** `0` is out of range (an error), and day-of-week names are case-insensitive. `7` =
+Saturday is **not** part of this assumption: it is deducible from documented text alone - the field
+table's own `1-7` range together with the `#` example's "3 refers to Tuesday" (so `1` = Sunday, `2` =
+Monday, `3` = Tuesday, ... `7` = Saturday) - so it needs no case in the Assumptions list.
 
 ### A3. Day-of-month/day-of-week "can't specify both" rule
 
@@ -848,6 +853,10 @@ example, 3#2 would be the second Tuesday of the month..." / "If you use a '#' ch
 define only one expression in the day-of-week field." / example `cron(15 10 ? * 6L 2019-2022)`
 captioned "runs at 10:15am UTC+0 on the last Friday of each month".
 (https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-scheduled-rule-pattern.html)
+
+**Assumption:** `LW` and `L-n` are unsupported in `aws`, because only `L`, `nW`, `nL` and `n#m` are
+documented or demonstrated; such a term parses but is flagged `unsupported: true` rather than
+rejected outright.
 
 ### A5. `/` increment meaning; `*/15` documented?
 
@@ -917,6 +926,9 @@ are valid."
 (https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-scheduled-rule-pattern.html) / "A rate
 expression consists of a value as a positive integer."
 (https://docs.aws.amazon.com/scheduler/latest/APIReference/API_CreateSchedule.html)
+
+**Assumption:** with no documented upper bound on `value`, this corpus rejects a rate whose resulting
+`seconds` is not a JavaScript safe integer, i.e. beyond 2^53 - 1 seconds.
 
 ### A10. When does a rate schedule first fire, anchored to what?
 
