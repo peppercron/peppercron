@@ -506,8 +506,9 @@ Every behaviour pinned only by an `assumed` case, in one place. Found by searchi
    at all. Assumed both are errors. Cases: `github-sunday-seven-is-an-error`,
    `github-reversed-range-is-an-error`. Two detection cases inherit this assumption, because "GitHub
    does not accept this input" is part of why the other dialect wins: `detect-sunday-seven-is-vixie-only`
-   and `detect-weekend-range-is-vixie-only` (the latter also cites H3 and K5 for the vixie/Kubernetes
-   side of the comparison).
+   (which also cites K2, where `7` is a hard error in Kubernetes too) and
+   `detect-weekend-range-is-vixie-only` (which also cites H3 and K5 for the vixie/Kubernetes side of the
+   comparison).
 2. **G5 (gap) - which schedules GitHub Actions advances out of a spring-forward gap.** GitHub documents
    only a single fixed-time example (`2:30 -> 3:00`). Assumed only a fixed-time schedule advances, one
    run per gap, none when a natural run already exists at the transition instant, and a wildcard
@@ -616,14 +617,17 @@ not the reference, and should carry this list forward.
     re-verification before this corpus is trusted at face value for Kubernetes.
 12. **robfig accepts a schedule this corpus refuses outright.** robfig's comma split drops empty runs,
     so an empty list item and a trailing comma both parse (`1,,2` -> `{1,2}`, a trailing comma is
-    accepted), and, because its only field-position check is on the first comma-separated term, `*-5`
-    and `?-5` both parse as a plain `*` with the text after the hyphen silently discarded (K3, K9). Here
+    accepted), and, because the `*`/`?` test looks only at the part of a term before its first hyphen,
+    `*-5` and `?-5` both parse as a plain `*` with the text after the hyphen silently discarded (K3, K9). Here
     all four are `bad-token` (`parse('1,,2 * * * *', {dialect:'kubernetes'})` -> `bad-token [2,2]`), so a
     schedule Kubernetes/robfig admits is refused here.
 13. **robfig requires exactly `"@every "` before the duration; this corpus is tolerant of whitespace
     around and inside it.** robfig's descriptor `switch` matches `"@every "` (a single space) as a
-    literal prefix, so anything else there - no space, two spaces, a tab, a leading space before `@every`
-    itself - falls through to `unrecognized descriptor` or the five-field parser instead. Here `@every`
+    literal prefix and hands the rest of the string to Go's `time.ParseDuration`, so each way of writing
+    it differently fails differently: `@every5m` and `@every` + a tab + `5m` never match the prefix and
+    are `unrecognized descriptor`; `@every  5m` does match it, then fails inside `ParseDuration` on the
+    remaining `" 5m"`; and ` @every 5m` does not start with `@` at all, so it reaches the five-field
+    parser (K6, K7). Here `@every`
     accepts one or more of the same whitespace characters listed under Tokenizing both before the
     duration and around the whole macro (`@every  5m`, `@every\t5m`, `@every` + a U+00A0 non-breaking space + `5m`, ` @every 5m` and
     `@every 5m ` all parse to the same 300-second interval).
