@@ -5,7 +5,7 @@
     "type": "object",
     "additionalProperties": false,
     "required": ["id", "input", "provenance"],
-    "oneOf": [{ "required": ["expect"] }, { "required": ["expectError"] }],
+    "oneOf": [{ "required": ["expect"] }, { "required": ["expectSummary"] }, { "required": ["expectError"] }],
     "properties": {
       "id": { "description": "Unique within the corpus; a runner reports failures by it.", "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
       "input": { "description": "The expression exactly as a user would type it. It is never trimmed or normalised before parsing, and spans index into it.", "type": "string" },
@@ -19,6 +19,19 @@
         "description": "The whole Schedule the parse returns, compared in full: every field with its raw, span, terms, values and star, plus the optional macro, trailing and candidates. An optional key absent here must be absent there.",
         "type": "object",
         "required": ["dialect", "source", "timezone", "fields"]
+      },
+      "expectSummary": {
+        "description": "A partial expectation, for cases where the whole Schedule would be noise. `dialect` is always compared. `candidates` and `unsupported` are compared exactly, and absent here means absent (or empty) there. `values` and `star` compare only the fields they name.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["dialect"],
+        "properties": {
+          "dialect": { "type": "string" },
+          "candidates": { "type": "array", "items": { "type": "string" } },
+          "unsupported": { "description": "Names of the fields holding at least one term marked unsupported, in field order.", "type": "array", "items": { "type": "string" } },
+          "values": { "description": "Field name to its exact Field.values.", "type": "object", "additionalProperties": { "type": "array", "items": { "type": "integer" } } },
+          "star": { "description": "Field name to its exact Field.star.", "type": "object", "additionalProperties": { "type": "boolean" } }
+        }
       },
       "expectError": {
         "description": "The ParseError the parse returns instead. Parsing never throws and never returns a partial schedule.",
@@ -35,17 +48,18 @@
   },
   "definitions": {
     "provenance": {
-      "description": "Where the expected values come from. `spec` = the dialect specification or documented behaviour; `derived` = read from reference source, with `source` citing the section; `captured` = recorded from a running reference implementation, with `platform` and `recording`.",
+      "description": "Where the expected values come from. `spec` = the dialect specification or documented behaviour; `derived` = read from reference source, with `source` citing the section; `assumed` = the platform's documentation is silent and this is the behaviour the corpus chose; `source` cites the DERIVATION entry that records the silence and the reason; `captured` = recorded from a running reference implementation, with `platform` and `recording`.",
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["spec", "derived", "captured"] },
+        "kind": { "enum": ["spec", "derived", "assumed", "captured"] },
         "source": { "type": "string" },
         "platform": { "type": "string" },
         "recording": { "type": "string" }
       },
       "allOf": [
         { "if": { "properties": { "kind": { "const": "derived" } } }, "then": { "required": ["source"] } },
+        { "if": { "properties": { "kind": { "const": "assumed" } } }, "then": { "required": ["source"] } },
         { "if": { "properties": { "kind": { "const": "captured" } } }, "then": { "required": ["platform", "recording"] } }
       ]
     }

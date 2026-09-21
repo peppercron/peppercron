@@ -42,17 +42,18 @@
       "notMatching": { "description": "Instants a runner must assert matches() is false for: the cases where a plain wall-clock field test would say true but the dialect's DST strategy does not emit the run.", "type": "array", "items": { "$ref": "#/definitions/instant" } },
       "skipDerived": { "description": "Suppresses the derived matches() and prev() checks (see corpus/README.md). For a case whose `expect` is deliberately a partial view of its window.", "type": "boolean" },
       "provenance": {
-        "description": "Where the expected values come from. `spec` = the dialect specification or documented behaviour; `derived` = read from reference source, with `source` citing the section; `captured` = recorded from a running reference implementation, with `platform` and `recording`.",
+        "description": "Where the expected values come from. `spec` = the dialect specification or documented behaviour; `derived` = read from reference source, with `source` citing the section; `assumed` = the platform's documentation is silent and this is the behaviour the corpus chose; `source` cites the DERIVATION entry that records the silence and the reason; `captured` = recorded from a running reference implementation, with `platform` and `recording`.",
         "type": "object",
         "required": ["kind"],
         "properties": {
-          "kind": { "enum": ["spec", "derived", "captured"] },
+          "kind": { "enum": ["spec", "derived", "assumed", "captured"] },
           "source": { "type": "string" },
           "platform": { "type": "string" },
           "recording": { "type": "string" }
         },
         "allOf": [
           { "if": { "properties": { "kind": { "const": "derived" } } }, "then": { "required": ["source"] } },
+          { "if": { "properties": { "kind": { "const": "assumed" } } }, "then": { "required": ["source"] } },
           { "if": { "properties": { "kind": { "const": "captured" } } }, "then": { "required": ["platform", "recording"] } }
         ]
       }
