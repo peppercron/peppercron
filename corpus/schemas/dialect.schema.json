@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "family", "fields", "macros", "trailingCommand", "rangeWrap", "singleStep", "domDow", "dstGap", "dstOverlap", "missedRuns", "defaultTimezone"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z-]*$" },
+    "family": { "type": "string" },
+    "fields": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "min", "max"],
+        "properties": {
+          "name": { "enum": ["second", "minute", "hour", "dayOfMonth", "month", "dayOfWeek", "year"] },
+          "min": { "type": "integer" },
+          "max": { "type": "integer" },
+          "names": { "enum": ["month", "dow"] },
+          "sundayIs": { "enum": [0, 1] },
+          "tokens": { "type": "array", "uniqueItems": true, "items": { "enum": ["?", "L", "L-n", "W", "LW", "nL", "#"] } },
+          "optional": { "type": "boolean" }
+        }
+      }
+    },
+    "macros": {
+      "type": "object",
+      "propertyNames": { "pattern": "^@[a-z]+$" },
+      "additionalProperties": { "type": ["string", "null"] }
+    },
+    "trailingCommand": { "type": "boolean" },
+    "rangeWrap": { "enum": ["error", "empty", "wrap"] },
+    "singleStep": { "enum": ["error", "to-max"] },
+    "domDow": { "type": "string" },
+    "dstGap": { "type": "string" },
+    "dstOverlap": { "type": "string" },
+    "missedRuns": { "enum": ["none", "misfire-policy"] },
+    "defaultTimezone": { "enum": ["host", "utc"] }
+  }
+}

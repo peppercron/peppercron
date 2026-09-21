@@ -1,0 +1,29 @@
+{
+  "id": "vixie",
+  "family": "cron-fields",
+  "fields": [
+    { "name": "minute", "min": 0, "max": 59 },
+    { "name": "hour", "min": 0, "max": 23 },
+    { "name": "dayOfMonth", "min": 1, "max": 31 },
+    { "name": "month", "min": 1, "max": 12, "names": "month" },
+    { "name": "dayOfWeek", "min": 0, "max": 7, "sundayIs": 0, "names": "dow" }
+  ],
+  "macros": {
+    "@yearly": "0 0 1 1 *",
+    "@annually": "0 0 1 1 *",
+    "@monthly": "0 0 1 * *",
+    "@weekly": "0 0 * * 0",
+    "@daily": "0 0 * * *",
+    "@midnight": "0 0 * * *",
+    "@hourly": "0 * * * *",
+    "@reboot": null
+  },
+  "trailingCommand": true,
+  "rangeWrap": "empty",
+  "singleStep": "error",
+  "domDow": "or",
+  "dstGap": "vixie-window",
+  "dstOverlap": "vixie-window",
+  "missedRuns": "none",
+  "defaultTimezone": "host"
+}

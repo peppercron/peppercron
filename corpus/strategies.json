@@ -1,0 +1,6 @@
+{
+  "family": ["cron-fields"],
+  "domDow": ["or", "exclusive-question"],
+  "dstGap": ["skip", "vixie-window"],
+  "dstOverlap": ["once", "once-second", "vixie-window"]
+}

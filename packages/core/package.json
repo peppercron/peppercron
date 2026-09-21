@@ -24,7 +24,10 @@
     "dist"
   ],
   "scripts": {
+    "gen": "node scripts/gen-corpus.mjs",
+    "pretest": "npm run gen",
     "test": "vitest run",
+    "pretypecheck": "npm run gen",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
