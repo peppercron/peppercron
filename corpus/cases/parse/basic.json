@@ -1,0 +1,137 @@
+[
+  {
+    "id": "vixie-weekly-explicit",
+    "input": "0 2 * * 1",
+    "options": { "dialect": "vixie" },
+    "expect": {
+      "dialect": "vixie", "source": "0 2 * * 1", "timezone": "UTC",
+      "fields": [
+        { "name": "minute", "raw": "0", "span": [0, 1], "terms": [{ "raw": "0", "span": [0, 1], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "hour", "raw": "2", "span": [2, 3], "terms": [{ "raw": "2", "span": [2, 3], "kind": "range", "from": 2, "to": 2, "step": 1 }], "values": [2], "star": false },
+        { "name": "dayOfMonth", "raw": "*", "span": [4, 5], "terms": [{ "raw": "*", "span": [4, 5], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31], "star": true },
+        { "name": "month", "raw": "*", "span": [6, 7], "terms": [{ "raw": "*", "span": [6, 7], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12], "star": true },
+        { "name": "dayOfWeek", "raw": "1", "span": [8, 9], "terms": [{ "raw": "1", "span": [8, 9], "kind": "range", "from": 1, "to": 1, "step": 1 }], "values": [1], "star": false }
+      ]
+    },
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-nth-friday-detected",
+    "input": "0 0 12 ? * 6#3",
+    "expect": {
+      "dialect": "quartz", "source": "0 0 12 ? * 6#3", "timezone": "UTC",
+      "fields": [
+        { "name": "second", "raw": "0", "span": [0, 1], "terms": [{ "raw": "0", "span": [0, 1], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "minute", "raw": "0", "span": [2, 3], "terms": [{ "raw": "0", "span": [2, 3], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "hour", "raw": "12", "span": [4, 6], "terms": [{ "raw": "12", "span": [4, 6], "kind": "range", "from": 12, "to": 12, "step": 1 }], "values": [12], "star": false },
+        { "name": "dayOfMonth", "raw": "?", "span": [7, 8], "terms": [{ "raw": "?", "span": [7, 8], "kind": "unspecified" }], "values": [], "star": false },
+        { "name": "month", "raw": "*", "span": [9, 10], "terms": [{ "raw": "*", "span": [9, 10], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12], "star": true },
+        { "name": "dayOfWeek", "raw": "6#3", "span": [11, 14], "terms": [{ "raw": "6#3", "span": [11, 14], "kind": "nthDow", "dow": 5, "n": 3 }], "values": [], "star": false }
+      ]
+    },
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-crontab-line-with-command",
+    "input": "0 2 * * *  /usr/bin/backup --full",
+    "expect": {
+      "dialect": "vixie", "source": "0 2 * * *  /usr/bin/backup --full", "timezone": "UTC",
+      "fields": [
+        { "name": "minute", "raw": "0", "span": [0, 1], "terms": [{ "raw": "0", "span": [0, 1], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "hour", "raw": "2", "span": [2, 3], "terms": [{ "raw": "2", "span": [2, 3], "kind": "range", "from": 2, "to": 2, "step": 1 }], "values": [2], "star": false },
+        { "name": "dayOfMonth", "raw": "*", "span": [4, 5], "terms": [{ "raw": "*", "span": [4, 5], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31], "star": true },
+        { "name": "month", "raw": "*", "span": [6, 7], "terms": [{ "raw": "*", "span": [6, 7], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12], "star": true },
+        { "name": "dayOfWeek", "raw": "*", "span": [8, 9], "terms": [{ "raw": "*", "span": [8, 9], "kind": "any", "step": 1 }], "values": [0,1,2,3,4,5,6], "star": true }
+      ],
+      "trailing": { "text": "/usr/bin/backup --full", "span": [11, 33] }
+    },
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-names-and-sunday-seven",
+    "input": "15 10 * JAN-MAR 5-7",
+    "options": { "dialect": "vixie" },
+    "expect": {
+      "dialect": "vixie", "source": "15 10 * JAN-MAR 5-7", "timezone": "UTC",
+      "fields": [
+        { "name": "minute", "raw": "15", "span": [0, 2], "terms": [{ "raw": "15", "span": [0, 2], "kind": "range", "from": 15, "to": 15, "step": 1 }], "values": [15], "star": false },
+        { "name": "hour", "raw": "10", "span": [3, 5], "terms": [{ "raw": "10", "span": [3, 5], "kind": "range", "from": 10, "to": 10, "step": 1 }], "values": [10], "star": false },
+        { "name": "dayOfMonth", "raw": "*", "span": [6, 7], "terms": [{ "raw": "*", "span": [6, 7], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31], "star": true },
+        { "name": "month", "raw": "JAN-MAR", "span": [8, 15], "terms": [{ "raw": "JAN-MAR", "span": [8, 15], "kind": "range", "from": 1, "to": 3, "step": 1 }], "values": [1, 2, 3], "star": false },
+        { "name": "dayOfWeek", "raw": "5-7", "span": [16, 19], "terms": [{ "raw": "5-7", "span": [16, 19], "kind": "range", "from": 5, "to": 0, "step": 1 }], "values": [0, 5, 6], "star": false }
+      ]
+    },
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-macro-daily",
+    "input": "@daily",
+    "expect": {
+      "dialect": "vixie", "source": "@daily", "timezone": "UTC", "macro": "@daily",
+      "fields": [
+        { "name": "minute", "raw": "0", "span": [0, 6], "terms": [{ "raw": "0", "span": [0, 6], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "hour", "raw": "0", "span": [0, 6], "terms": [{ "raw": "0", "span": [0, 6], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "dayOfMonth", "raw": "*", "span": [0, 6], "terms": [{ "raw": "*", "span": [0, 6], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31], "star": true },
+        { "name": "month", "raw": "*", "span": [0, 6], "terms": [{ "raw": "*", "span": [0, 6], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12], "star": true },
+        { "name": "dayOfWeek", "raw": "*", "span": [0, 6], "terms": [{ "raw": "*", "span": [0, 6], "kind": "any", "step": 1 }], "values": [0,1,2,3,4,5,6], "star": true }
+      ]
+    },
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-macro-reboot-has-no-fields",
+    "input": "@reboot",
+    "expect": { "dialect": "vixie", "source": "@reboot", "timezone": "UTC", "macro": "@reboot", "fields": [] },
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-unsupported-token-still-parses",
+    "input": "0 0 L * *",
+    "options": { "dialect": "vixie" },
+    "expect": {
+      "dialect": "vixie", "source": "0 0 L * *", "timezone": "UTC",
+      "fields": [
+        { "name": "minute", "raw": "0", "span": [0, 1], "terms": [{ "raw": "0", "span": [0, 1], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "hour", "raw": "0", "span": [2, 3], "terms": [{ "raw": "0", "span": [2, 3], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "dayOfMonth", "raw": "L", "span": [4, 5], "terms": [{ "raw": "L", "span": [4, 5], "kind": "last", "offset": 0, "unsupported": true }], "values": [], "star": false },
+        { "name": "month", "raw": "*", "span": [6, 7], "terms": [{ "raw": "*", "span": [6, 7], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12], "star": true },
+        { "name": "dayOfWeek", "raw": "*", "span": [8, 9], "terms": [{ "raw": "*", "span": [8, 9], "kind": "any", "step": 1 }], "values": [0,1,2,3,4,5,6], "star": true }
+      ]
+    },
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-reversed-range-is-empty",
+    "input": "0 22-2 * * *",
+    "options": { "dialect": "vixie" },
+    "expect": {
+      "dialect": "vixie", "source": "0 22-2 * * *", "timezone": "UTC",
+      "fields": [
+        { "name": "minute", "raw": "0", "span": [0, 1], "terms": [{ "raw": "0", "span": [0, 1], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "hour", "raw": "22-2", "span": [2, 6], "terms": [{ "raw": "22-2", "span": [2, 6], "kind": "range", "from": 22, "to": 2, "step": 1 }], "values": [], "star": false },
+        { "name": "dayOfMonth", "raw": "*", "span": [7, 8], "terms": [{ "raw": "*", "span": [7, 8], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31], "star": true },
+        { "name": "month", "raw": "*", "span": [9, 10], "terms": [{ "raw": "*", "span": [9, 10], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12], "star": true },
+        { "name": "dayOfWeek", "raw": "*", "span": [11, 12], "terms": [{ "raw": "*", "span": [11, 12], "kind": "any", "step": 1 }], "values": [0,1,2,3,4,5,6], "star": true }
+      ]
+    },
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H3" }
+  },
+  {
+    "id": "quartz-seven-fields-names-step-timezone",
+    "input": "0 0/15 8-10 ? * MON-FRI 2027",
+    "options": { "dialect": "quartz", "timezone": "Europe/London" },
+    "expect": {
+      "dialect": "quartz", "source": "0 0/15 8-10 ? * MON-FRI 2027", "timezone": "Europe/London",
+      "fields": [
+        { "name": "second", "raw": "0", "span": [0, 1], "terms": [{ "raw": "0", "span": [0, 1], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
+        { "name": "minute", "raw": "0/15", "span": [2, 6], "terms": [{ "raw": "0/15", "span": [2, 6], "kind": "range", "from": 0, "to": 59, "step": 15 }], "values": [0, 15, 30, 45], "star": false },
+        { "name": "hour", "raw": "8-10", "span": [7, 11], "terms": [{ "raw": "8-10", "span": [7, 11], "kind": "range", "from": 8, "to": 10, "step": 1 }], "values": [8, 9, 10], "star": false },
+        { "name": "dayOfMonth", "raw": "?", "span": [12, 13], "terms": [{ "raw": "?", "span": [12, 13], "kind": "unspecified" }], "values": [], "star": false },
+        { "name": "month", "raw": "*", "span": [14, 15], "terms": [{ "raw": "*", "span": [14, 15], "kind": "any", "step": 1 }], "values": [1,2,3,4,5,6,7,8,9,10,11,12], "star": true },
+        { "name": "dayOfWeek", "raw": "MON-FRI", "span": [16, 23], "terms": [{ "raw": "MON-FRI", "span": [16, 23], "kind": "range", "from": 1, "to": 5, "step": 1 }], "values": [1, 2, 3, 4, 5], "star": false },
+        { "name": "year", "raw": "2027", "span": [24, 28], "terms": [{ "raw": "2027", "span": [24, 28], "kind": "range", "from": 2027, "to": 2027, "step": 1 }], "values": [2027], "star": false }
+      ]
+    },
+    "provenance": { "kind": "spec" }
+  }
+]

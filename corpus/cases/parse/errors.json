@@ -1,0 +1,15 @@
+[
+  { "id": "empty-string", "input": "", "expectError": { "code": "empty", "span": [0, 0] }, "provenance": { "kind": "spec" } },
+  { "id": "blank-string", "input": "   ", "expectError": { "code": "empty", "span": [0, 3] }, "provenance": { "kind": "spec" } },
+  { "id": "vixie-too-few-fields", "input": "0 2 * *", "options": { "dialect": "vixie" }, "expectError": { "code": "field-count", "span": [0, 7] }, "provenance": { "kind": "spec" } },
+  { "id": "quartz-too-many-fields", "input": "0 0 12 ? * MON 2027 extra", "options": { "dialect": "quartz" }, "expectError": { "code": "field-count", "span": [0, 25] }, "provenance": { "kind": "spec" } },
+  { "id": "minute-out-of-range", "input": "61 * * * *", "options": { "dialect": "vixie" }, "expectError": { "code": "out-of-range", "span": [0, 2] }, "provenance": { "kind": "spec" } },
+  { "id": "zero-step", "input": "*/0 * * * *", "options": { "dialect": "vixie" }, "expectError": { "code": "bad-step", "span": [0, 3] }, "provenance": { "kind": "spec" } },
+  { "id": "unknown-day-name", "input": "0 0 * * FOO", "options": { "dialect": "vixie" }, "expectError": { "code": "bad-token", "span": [8, 11] }, "provenance": { "kind": "spec" } },
+  { "id": "bad-term-inside-a-list", "input": "0 1,99,3 * * *", "options": { "dialect": "vixie" }, "expectError": { "code": "out-of-range", "span": [4, 6] }, "provenance": { "kind": "spec" } },
+  { "id": "unknown-macro", "input": "@bogus", "expectError": { "code": "unknown-macro", "span": [0, 6] }, "provenance": { "kind": "spec" } },
+  { "id": "vixie-step-after-single-value", "input": "5/15 * * * *", "options": { "dialect": "vixie" }, "expectError": { "code": "bad-step", "span": [0, 4] }, "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H7" } },
+  { "id": "quartz-nth-out-of-range", "input": "0 0 12 ? * 6#6", "options": { "dialect": "quartz" }, "expectError": { "code": "out-of-range", "span": [11, 14] }, "provenance": { "kind": "spec" } },
+  { "id": "unknown-timezone", "input": "0 2 * * 1", "options": { "timezone": "Mars/Phobos" }, "expectError": { "code": "bad-timezone", "span": [0, 0] }, "provenance": { "kind": "spec" } },
+  { "id": "unknown-dialect", "input": "0 2 * * 1", "options": { "dialect": "bogus" }, "expectError": { "code": "unknown-dialect", "span": [0, 0] }, "provenance": { "kind": "spec" } }
+]

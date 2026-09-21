@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "input", "provenance"],
+    "oneOf": [{ "required": ["expect"] }, { "required": ["expectError"] }],
+    "properties": {
+      "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "input": { "type": "string" },
+      "options": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": { "dialect": { "type": "string" }, "timezone": { "type": "string" } }
+      },
+      "expect": {
+        "type": "object",
+        "required": ["dialect", "source", "timezone", "fields"]
+      },
+      "expectError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "span"],
+        "properties": {
+          "code": { "enum": ["empty", "field-count", "bad-token", "out-of-range", "bad-step", "bad-range", "unknown-macro", "unknown-dialect", "bad-timezone"] },
+          "span": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }
+        }
+      },
+      "provenance": { "$ref": "#/definitions/provenance" }
+    }
+  },
+  "definitions": {
+    "provenance": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["spec", "derived", "captured"] },
+        "source": { "type": "string" },
+        "platform": { "type": "string" },
+        "recording": { "type": "string" }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "derived" } } }, "then": { "required": ["source"] } },
+        { "if": { "properties": { "kind": { "const": "captured" } } }, "then": { "required": ["platform", "recording"] } }
+      ]
+    }
+  }
+}
