@@ -56,6 +56,8 @@ export const DST_OVERLAP: Record<string, OverlapStrategy> = {
   'once-second': (_c, pass) => pass === 'second',
   // cronie: fixed-time jobs run on the first pass only; wildcard jobs follow real time through both.
   'vixie-window': (c, pass) => pass === 'first' || !c.fixedTime,
+  // robfig/cron reads only the wall clock, so both passes match; Kubernetes really creates two Jobs (DERIVATION K13).
+  repeat: () => true,
 };
 
 interface RawRun {

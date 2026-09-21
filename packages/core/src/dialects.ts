@@ -8,7 +8,7 @@ export interface FieldSpec {
   names?: 'month' | 'dow';
   /** The number this dialect uses for Sunday in the day-of-week field. */
   sundayIs?: number;
-  /** Special token ids this field allows: '?', 'L', 'L-n', 'W', 'LW', 'nL', '#'. */
+  /** Special token ids this field allows: '?', '?*', 'L', 'L-n', 'W', 'LW', 'nL', '#'. */
   tokens?: string[];
   optional?: boolean;
 }
@@ -23,6 +23,8 @@ export interface DialectSpec {
   rangeWrap: 'error' | 'empty' | 'wrap';
   /** What `5/15` means: a parse error (cronie), or 5 through the field maximum every 15 (Quartz). */
   singleStep: 'error' | 'to-max';
+  /** A star strategy id: when a field counts as a star. */
+  star: string;
   domDow: string;
   dstGap: string;
   dstOverlap: string;
@@ -30,7 +32,7 @@ export interface DialectSpec {
   defaultTimezone: string;
 }
 
-export type StrategyAxis = 'family' | 'domDow' | 'dstGap' | 'dstOverlap';
+export type StrategyAxis = 'family' | 'domDow' | 'star' | 'dstGap' | 'dstOverlap';
 
 const data = DIALECT_DATA as Record<string, DialectSpec>;
 

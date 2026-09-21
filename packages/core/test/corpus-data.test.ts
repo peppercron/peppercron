@@ -31,7 +31,7 @@ describe('corpus data', () => {
     const listed = readJson<Record<string, string[]>>('strategies.json');
     for (const id of readJson<string[]>('dialects/index.json')) {
       const d = readJson<Record<string, string>>(`dialects/${id}.json`);
-      for (const axis of ['family', 'domDow', 'dstGap', 'dstOverlap']) {
+      for (const axis of ['family', 'domDow', 'star', 'dstGap', 'dstOverlap']) {
         expect(listed[axis], `${id}.${axis}`).toContain(d[axis]);
       }
     }
@@ -40,7 +40,7 @@ describe('corpus data', () => {
 
 describe('dialects module', () => {
   it('exposes the generated data', () => {
-    expect(dialectOrder).toEqual(['vixie', 'quartz']);
+    expect(dialectOrder).toEqual(['vixie', 'kubernetes', 'quartz']);
     expect(getDialect('quartz')?.fields).toHaveLength(7);
     expect(getDialect('vixie')?.macros['@reboot']).toBeNull();
     expect(strategyIds.dstGap).toEqual(['skip', 'vixie-window']);

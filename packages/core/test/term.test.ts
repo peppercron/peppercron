@@ -101,3 +101,24 @@ describe('parseTerm: errors', () => {
     expect(r.ok ? null : r.error.span).toEqual([4, 6]);
   });
 });
+
+describe('the ?* token (robfig/cron, DERIVATION K3)', () => {
+  const k8s = getDialect('kubernetes')!;
+  const term = (piece: string, index: number) => parseTerm(piece, [0, piece.length], k8s.fields[index], k8s);
+
+  it('reads ? as * in every kubernetes field, with no unsupported mark', () => {
+    for (let i = 0; i < 5; i++) {
+      expect(term('?', i)).toEqual({ ok: true, value: { raw: '?', span: [0, 1], kind: 'any', step: 1 } });
+    }
+  });
+
+  it('allows a step after ?', () => {
+    expect(term('?/15', 0)).toEqual({ ok: true, value: { raw: '?/15', span: [0, 4], kind: 'any', step: 15 } });
+  });
+
+  it('still rejects ? outside the day fields in a dialect without the token', () => {
+    const vixieDialect = getDialect('vixie')!;
+    const r = parseTerm('?', [0, 1], vixieDialect.fields[0], vixieDialect);
+    expect(r.ok).toBe(false);
+  });
+});

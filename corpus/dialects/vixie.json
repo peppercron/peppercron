@@ -21,6 +21,7 @@
   "trailingCommand": true,
   "rangeWrap": "empty",
   "singleStep": "error",
+  "star": "leading",
   "domDow": "or",
   "dstGap": "vixie-window",
   "dstOverlap": "vixie-window",

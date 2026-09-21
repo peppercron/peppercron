@@ -6,6 +6,16 @@ import { canonicalValue, normaliseTerm, sortedUnique } from './normalise';
 import { parseTerm } from './term';
 import type { Token } from './tokenize';
 
+export type StarStrategy = (terms: Term[]) => boolean;
+
+/** Strategy registry for the `star` axis of corpus/strategies.json. */
+export const STAR: Record<string, StarStrategy> = {
+  // cronie: the field text begins with '*', so `*/2` is a star and `5,*` is not.
+  leading: (terms) => terms[0].kind === 'any',
+  // robfig/cron: any term that is `*` or `?` with no step above 1 (DERIVATION K10): the opposite on both.
+  'unstepped-term': (terms) => terms.some((t) => t.kind === 'any' && t.step === 1),
+};
+
 export function parseField(token: Token, f: FieldSpec, d: DialectSpec): Result<Field, ParseError> {
   const terms: Term[] = [];
   const values: number[] = [];
@@ -32,6 +42,6 @@ export function parseField(token: Token, f: FieldSpec, d: DialectSpec): Result<F
     span: token.span,
     terms,
     values: sortedUnique(values),
-    star: terms[0].kind === 'any',
+    star: (STAR[d.star] ?? STAR.leading)(terms),
   });
 }

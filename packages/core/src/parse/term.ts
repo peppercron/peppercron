@@ -25,9 +25,10 @@ function readValue(text: string, f: FieldSpec, span: Span): Result<number, Parse
 function readBody(up: string, span: Span, f: FieldSpec, d: DialectSpec): Result<Parsed, ParseError> {
   const isDom = f.name === 'dayOfMonth';
   const isDow = f.name === 'dayOfWeek';
+  const questionIsStar = (f.tokens ?? []).includes('?*');
   let m: RegExpExecArray | null;
 
-  if (up === '?') {
+  if (up === '?' && !questionIsStar) {
     return isDom || isDow
       ? done({ kind: 'unspecified' }, '?')
       : fail('bad-token', '"?" is only valid in the day fields', span);
@@ -78,7 +79,7 @@ function readBody(up: string, span: Span, f: FieldSpec, d: DialectSpec): Result<
   }
 
   const head = parts[0];
-  if (head === '*') return done({ kind: 'any', step }, null);
+  if (head === '*' || (questionIsStar && head === '?')) return done({ kind: 'any', step }, null);
 
   const bounds = head.split('-');
   if (bounds.length > 2 || bounds.some((b) => b === '')) {

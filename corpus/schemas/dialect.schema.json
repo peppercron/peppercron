@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "family", "fields", "macros", "trailingCommand", "rangeWrap", "singleStep", "domDow", "dstGap", "dstOverlap", "missedRuns", "defaultTimezone"],
+  "required": ["id", "family", "fields", "macros", "trailingCommand", "rangeWrap", "singleStep", "star", "domDow", "dstGap", "dstOverlap", "missedRuns", "defaultTimezone"],
   "properties": {
     "id": { "description": "Must equal the filename stem and appear in dialects/index.json.", "type": "string", "pattern": "^[a-z][a-z-]*$" },
     "family": { "description": "A family strategy id from strategies.json.", "type": "string" },
@@ -20,7 +20,7 @@
           "max": { "description": "Highest accepted value, inclusive, in the dialect's own numbering. Anything outside min..max is an out-of-range error.", "type": "integer" },
           "names": { "description": "Which set of three-letter names this field accepts, case-insensitively.", "enum": ["month", "dow"] },
           "sundayIs": { "description": "The number this dialect writes Sunday as in day-of-week. Parsed values are canonicalised from it to Sunday = 0.", "enum": [0, 1] },
-          "tokens": { "description": "The special tokens this field supports. A token the grammar can parse but this list omits is not an error: the term parses with unsupported: true and is still evaluated.", "type": "array", "uniqueItems": true, "items": { "enum": ["?", "L", "L-n", "W", "LW", "nL", "#"] } },
+          "tokens": { "description": "The special tokens this field supports. A token the grammar can parse but this list omits is not an error: the term parses with unsupported: true and is still evaluated. `?*` means this field accepts `?` as an exact synonym for `*` (robfig/cron), which parses to kind `any`, not `unspecified`.", "type": "array", "uniqueItems": true, "items": { "enum": ["?", "?*", "L", "L-n", "W", "LW", "nL", "#"] } },
           "optional": { "description": "This trailing field may be omitted.", "type": "boolean" }
         }
       }
@@ -34,10 +34,11 @@
     "trailingCommand": { "description": "True: tokens past the last field become Schedule.trailing (a crontab line). False: extra tokens are a field-count error.", "type": "boolean" },
     "rangeWrap": { "description": "What a range whose start is after its end means: a bad-range error, an empty set, or wrapping across the field boundary.", "enum": ["error", "empty", "wrap"] },
     "singleStep": { "description": "What a step after a single value (5/15) means: a bad-step error, or 5 through the field maximum every 15.", "enum": ["error", "to-max"] },
+    "star": { "description": "A star strategy id from strategies.json.", "type": "string" },
     "domDow": { "description": "A domDow strategy id from strategies.json.", "type": "string" },
     "dstGap": { "description": "A dstGap strategy id from strategies.json.", "type": "string" },
     "dstOverlap": { "description": "A dstOverlap strategy id from strategies.json.", "type": "string" },
-    "missedRuns": { "description": "What the reference implementation does with runs missed while it was not running. Recorded for later work; the engine does not read it.", "enum": ["none", "misfire-policy"] },
+    "missedRuns": { "description": "What the reference implementation does with runs missed while it was not running. Recorded for later work; the engine does not read it.", "enum": ["none", "misfire-policy", "starting-deadline"] },
     "defaultTimezone": { "description": "What the reference implementation assumes when its user names no zone. A fact about the dialect, not about this library: parse here defaults to UTC and a Schedule always carries an explicit zone.", "enum": ["host", "utc"] }
   }
 }

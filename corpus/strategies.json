@@ -1,6 +1,7 @@
 {
   "family": ["cron-fields"],
   "domDow": ["or", "exclusive-question"],
+  "star": ["leading", "unstepped-term"],
   "dstGap": ["skip", "vixie-window"],
-  "dstOverlap": ["once-second", "vixie-window"]
+  "dstOverlap": ["once-second", "vixie-window", "repeat"]
 }

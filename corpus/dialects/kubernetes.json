@@ -1,0 +1,29 @@
+{
+  "id": "kubernetes",
+  "family": "cron-fields",
+  "fields": [
+    { "name": "minute", "min": 0, "max": 59, "tokens": ["?*"] },
+    { "name": "hour", "min": 0, "max": 23, "tokens": ["?*"] },
+    { "name": "dayOfMonth", "min": 1, "max": 31, "tokens": ["?*"] },
+    { "name": "month", "min": 1, "max": 12, "names": "month", "tokens": ["?*"] },
+    { "name": "dayOfWeek", "min": 0, "max": 6, "sundayIs": 0, "names": "dow", "tokens": ["?*"] }
+  ],
+  "macros": {
+    "@yearly": "0 0 1 1 *",
+    "@annually": "0 0 1 1 *",
+    "@monthly": "0 0 1 * *",
+    "@weekly": "0 0 * * 0",
+    "@daily": "0 0 * * *",
+    "@midnight": "0 0 * * *",
+    "@hourly": "0 * * * *"
+  },
+  "trailingCommand": false,
+  "rangeWrap": "error",
+  "singleStep": "to-max",
+  "star": "unstepped-term",
+  "domDow": "or",
+  "dstGap": "skip",
+  "dstOverlap": "repeat",
+  "missedRuns": "starting-deadline",
+  "defaultTimezone": "host"
+}

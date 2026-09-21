@@ -3,10 +3,11 @@
   "description": "The closed list of strategy ids per axis. A dialect may only name ids listed here, and an implementation must implement exactly these - no more, no fewer. A new id needs an evidence case that reaches it (the growth rule); see corpus/README.md.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["family", "domDow", "dstGap", "dstOverlap"],
+  "required": ["family", "domDow", "star", "dstGap", "dstOverlap"],
   "properties": {
     "family": { "description": "Which grammar parses an expression into fields.", "$ref": "#/definitions/ids" },
     "domDow": { "description": "How the day-of-month and day-of-week fields combine.", "$ref": "#/definitions/ids" },
+    "star": { "description": "When a field counts as a star for the domDow rule and for telling fixed-time from wildcard schedules.", "$ref": "#/definitions/ids" },
     "dstGap": { "description": "What happens to a run whose wall time a spring-forward skipped.", "$ref": "#/definitions/ids" },
     "dstOverlap": { "description": "What happens to a run whose wall time a fall-back repeated.", "$ref": "#/definitions/ids" }
   },

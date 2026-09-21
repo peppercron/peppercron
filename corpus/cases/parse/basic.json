@@ -67,7 +67,7 @@
     "id": "vixie-macro-daily",
     "input": "@daily",
     "expect": {
-      "dialect": "vixie", "source": "@daily", "timezone": "UTC", "macro": "@daily",
+      "dialect": "vixie", "source": "@daily", "timezone": "UTC", "macro": "@daily", "candidates": ["vixie", "kubernetes"],
       "fields": [
         { "name": "minute", "raw": "0", "span": [0, 6], "terms": [{ "raw": "0", "span": [0, 6], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },
         { "name": "hour", "raw": "0", "span": [0, 6], "terms": [{ "raw": "0", "span": [0, 6], "kind": "range", "from": 0, "to": 0, "step": 1 }], "values": [0], "star": false },

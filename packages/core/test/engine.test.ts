@@ -248,3 +248,18 @@ describe('hostile input', () => {
     expect(core.matches(malformed, from)).toBe(false);
   });
 });
+
+describe('kubernetes DST (DERIVATION K11-K13)', () => {
+  it('skips a fixed-time run that falls in a gap', () => {
+    const runs = core.next(sched('30 2 * * *', 'kubernetes', 'Test/NY'), { from: at('2026-03-07T12:00:00Z'), count: 1 });
+    expect(isos(runs)).toEqual(['2026-03-09T06:30:00.000Z']);
+  });
+
+  it('fires on both passes of an overlap', () => {
+    const runs = core.next(sched('30 1 * * *', 'kubernetes', 'Test/NY'), { from: at('2026-10-31T12:00:00Z'), count: 2 });
+    expect(runs.map((r) => [r.at.toISOString(), r.dst])).toEqual([
+      ['2026-11-01T05:30:00.000Z', 'ambiguous-first'],
+      ['2026-11-01T06:30:00.000Z', 'ambiguous-second'],
+    ]);
+  });
+});
