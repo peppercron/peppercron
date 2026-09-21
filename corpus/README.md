@@ -526,7 +526,8 @@ Every behaviour pinned only by an `assumed` case, in one place. Found by searchi
    flags `?`" is part of why Kubernetes wins: `detect-question-mark-in-five-fields-is-kubernetes` (which
    also cites K3 for the Kubernetes side).
 5. **A2 - whether AWS accepts `0` for Sunday.** AWS's docs establish `1` = Sunday only by example (never
-   in prose) and never say whether `0` is also accepted the way it names `7` as an alternate Saturday.
+   in prose), and the documented day-of-week range is `1-7`; they never say whether `0` is also accepted
+   as Sunday.
    Assumed `0` is `out-of-range`, and that day-of-week names are case-insensitive. `7` = Saturday is
    **not** part of this assumption - it follows from the documented `1-7` range together with the `#`
    example's "3 refers to Tuesday" (so `1` = Sunday ... `7` = Saturday), which is deducible from
