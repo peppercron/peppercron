@@ -1,4 +1,4 @@
-import { formatLocal } from './calendar';
+import { formatLocal, formatWall } from './calendar';
 import { getDialect, type DialectSpec } from './dialects';
 import { compile, nextWallMatch, type Compiled } from './matcher';
 import type {
@@ -18,28 +18,38 @@ const LEAF = 3600;
 const DEFAULT_COUNT = 10;
 const MAX_COUNT = 1000;
 
-/** How many catch-up runs to emit at the transition instant. gapStart/gapEnd are wall seconds. */
-export type GapStrategy = (c: Compiled, gapStart: number, gapEnd: number) => number;
+/**
+ * The wall seconds a gap skipped that this schedule should be caught up on, ascending: one catch-up run
+ * is emitted at the transition instant for each. gapStart/gapEnd are wall seconds, gapEnd exclusive.
+ */
+export type GapStrategy = (c: Compiled, gapStart: number, gapEnd: number) => number[];
 export type OverlapPass = 'first' | 'second';
 /** Whether a match inside an overlap is emitted on the given pass. */
 export type OverlapStrategy = (c: Compiled, pass: OverlapPass) => boolean;
 
-function countWallMatches(c: Compiled, from: number, limit: number): number {
-  let n = 0;
-  for (let w = nextWallMatch(c, from, limit); w !== null; w = nextWallMatch(c, w + c.resolution, limit)) n += 1;
-  return n;
+/**
+ * cronie only walks the skipped minutes one by one for a jump of up to `3 * MINUTE_COUNT` = 3 hours
+ * (`case medium`, DERIVATION H2); a wider jump resyncs and just runs the current minute, so a zone that
+ * skips a whole wall day produces no catch-up at all rather than a day's worth at one instant.
+ */
+const MAX_CATCH_UP_GAP = 3 * 3600;
+
+function wallMatches(c: Compiled, from: number, limit: number): number[] {
+  const out: number[] = [];
+  for (let w = nextWallMatch(c, from, limit); w !== null; w = nextWallMatch(c, w + c.resolution, limit)) out.push(w);
+  return out;
 }
 
 /** Strategy registry for the `dstGap` axis of corpus/strategies.json. */
 export const DST_GAP: Record<string, GapStrategy> = {
-  skip: () => 0,
+  skip: () => [],
   // cronie: fixed-time jobs run once per skipped matching minute, right after the jump (DERIVATION H2).
-  'vixie-window': (c, gapStart, gapEnd) => (c.fixedTime ? countWallMatches(c, gapStart, gapEnd) : 0),
+  'vixie-window': (c, gapStart, gapEnd) =>
+    c.fixedTime && gapEnd - gapStart < MAX_CATCH_UP_GAP ? wallMatches(c, gapStart, gapEnd) : [],
 };
 
 /** Strategy registry for the `dstOverlap` axis of corpus/strategies.json. */
 export const DST_OVERLAP: Record<string, OverlapStrategy> = {
-  once: (_c, pass) => pass === 'first',
   // Quartz: java.util.Calendar resolves an ambiguous wall time to standard time (DERIVATION H6).
   'once-second': (_c, pass) => pass === 'second',
   // cronie: fixed-time jobs run on the first pass only; wildcard jobs follow real time through both.
@@ -51,6 +61,8 @@ interface RawRun {
   wall: number;
   offset: number;
   dst?: DstTag;
+  /** Wall seconds this catch-up run stands in for; only set alongside dst 'skipped-adjusted'. */
+  scheduled?: number;
 }
 
 /** Every run with startSec <= at <= endSec, in non-decreasing order, walking segments of constant UTC offset. */
@@ -75,9 +87,8 @@ function* walk(c: Compiled, spec: DialectSpec, tz: Tz, zone: string, startSec: n
     const wallEnd = (after ? after.at : endSec + 1) + offset;
 
     if (before && before.after > before.before && before.at >= startSec && before.at <= endSec) {
-      const catchUps = onGap(c, before.at + before.before, before.at + before.after);
-      for (let n = 0; n < catchUps; n++) {
-        yield { at: before.at, wall: before.at + offset, offset, dst: 'skipped-adjusted' };
+      for (const scheduled of onGap(c, before.at + before.before, before.at + before.after)) {
+        yield { at: before.at, wall: before.at + offset, offset, dst: 'skipped-adjusted', scheduled };
       }
     }
 
@@ -172,6 +183,7 @@ function collectLatest(
 function toRun(r: RawRun): Run {
   const run: Run = { at: new Date(r.at * 1000), local: formatLocal(r.wall, r.offset) };
   if (r.dst) run.dst = r.dst;
+  if (r.scheduled !== undefined) run.scheduled = formatWall(r.scheduled);
   return run;
 }
 

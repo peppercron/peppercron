@@ -7,7 +7,12 @@ describe('public entry point', () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     const [run] = next(parsed.value, { from: new Date('2026-03-07T12:00:00Z'), count: 1 });
-    expect(run).toEqual({ at: new Date('2026-03-08T07:00:00Z'), local: '2026-03-08T03:00:00-04:00', dst: 'skipped-adjusted' });
+    expect(run).toEqual({
+      at: new Date('2026-03-08T07:00:00Z'),
+      local: '2026-03-08T03:00:00-04:00',
+      dst: 'skipped-adjusted',
+      scheduled: '2026-03-08T02:30:00',
+    });
     expect(matches(parsed.value, run.at)).toBe(true);
     expect(prev(parsed.value, { from: new Date('2026-03-08T07:00:01Z'), count: 1 })).toEqual([run]);
   });

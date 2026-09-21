@@ -58,6 +58,14 @@ export interface ParseOptions {
 }
 
 export interface RunOptions {
+  /**
+   * Where to start, exclusive unless `inclusive`. Defaults to now.
+   *
+   * Paging caveat: runs are non-decreasing, not strictly increasing. After a run tagged
+   * `skipped-adjusted`, other runs can share its instant, so paging with `from: lastRun.at` must ask
+   * for a full page rather than `count: 1` and de-duplicate on `at` plus `scheduled`; asking for one
+   * run at a time silently drops the rest of that instant's group.
+   */
   from?: Date;
   count?: number;
   until?: Date;
@@ -71,6 +79,12 @@ export interface Run {
   /** ISO wall time in the schedule timezone, with offset. */
   local: string;
   dst?: DstTag;
+  /**
+   * Only on a `skipped-adjusted` run: the wall time this run is catching up, as ISO local time with
+   * no offset (`2026-03-08T02:30:00`), because a wall time a gap skipped has no offset in the zone.
+   * Several catch-up runs can share one instant and one `local`; this is what tells them apart.
+   */
+  scheduled?: string;
 }
 
 /** A UTC-offset change. `at` is the first epoch second that has the new offset. Offsets are seconds east of UTC. */

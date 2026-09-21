@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCore } from '../src/core';
 import type { Dialect, Run, Schedule } from '../src/types';
-import { T_GAP, testTz } from './helpers/fake-tz';
+import { T_DAY_GAP, T_GAP, testTz } from './helpers/fake-tz';
 
 const core = createCore(testTz);
 const at = (iso: string) => new Date(iso);
@@ -49,18 +49,31 @@ describe('next: spring-forward gap', () => {
     expect(isos(runs)).toEqual(['2026-03-08T07:00:00.000Z', '2026-03-09T06:30:00.000Z', '2026-03-10T06:30:00.000Z']);
     expect(runs.map((r) => r.dst)).toEqual(['skipped-adjusted', undefined, undefined]);
     expect(runs[0].local).toBe('2026-03-08T03:00:00-04:00');
+    expect(runs[0].scheduled).toBe('2026-03-08T02:30:00');
   });
 
   it('vixie fixed-time: one catch-up run per skipped matching minute (H2)', () => {
     const runs = core.next(sched('0,30 2 * * *', 'vixie', 'Test/NY'), { from: at('2026-03-08T00:00:00Z'), count: 3 });
     expect(isos(runs)).toEqual(['2026-03-08T07:00:00.000Z', '2026-03-08T07:00:00.000Z', '2026-03-09T06:00:00.000Z']);
     expect(runs.map((r) => r.dst)).toEqual(['skipped-adjusted', 'skipped-adjusted', undefined]);
+    // The two runs share an instant and a local time; only `scheduled` tells them apart.
+    expect(runs.map((r) => r.scheduled)).toEqual(['2026-03-08T02:00:00', '2026-03-08T02:30:00', undefined]);
+  });
+
+  it('vixie fixed-time: a gap wider than cronie s three-hour catch-up window gets no catch-up (H2)', () => {
+    const runs = core.next(sched('0 0-23 * * *', 'vixie', 'Test/Apia'), { from: at('2011-12-30T07:30:00Z'), count: 3 });
+    expect(isos(runs)).toEqual(['2011-12-30T08:00:00.000Z', '2011-12-30T09:00:00.000Z', '2011-12-30T10:00:00.000Z']);
+    expect(runs.every((r) => r.dst === undefined)).toBe(true);
+    // The whole skipped wall day would otherwise arrive as 24 catch-up runs at the transition instant.
+    expect(runs[2].at.getTime() / 1000).toBe(T_DAY_GAP);
+    expect(runs[2].local).toBe('2011-12-31T00:00:00+14:00');
   });
 
   it('vixie fixed-time: the natural run at the transition instant still happens after the catch-up', () => {
     const runs = core.next(sched('0 2,3 * * *', 'vixie', 'Test/NY'), { from: at('2026-03-08T00:00:00Z'), count: 3 });
     expect(isos(runs)).toEqual(['2026-03-08T07:00:00.000Z', '2026-03-08T07:00:00.000Z', '2026-03-09T06:00:00.000Z']);
     expect(runs.map((r) => r.dst)).toEqual(['skipped-adjusted', undefined, undefined]);
+    expect(runs.map((r) => r.scheduled)).toEqual(['2026-03-08T02:00:00', undefined, undefined]);
   });
 
   it('vixie wildcard: skipped wall times simply do not occur', () => {
@@ -142,6 +155,13 @@ describe('prev', () => {
     const runs = core.prev(sched('* * * * 1 ?', 'quartz'), { from: at('2026-09-21T00:00:00Z'), count: 2 });
     expect(isos(runs)).toEqual(['2026-01-31T23:59:59.000Z', '2026-01-31T23:59:58.000Z']);
     expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it('returns the natural run before the catch-up run it shares an instant with', () => {
+    const runs = core.prev(sched('0 2,3 * * *', 'vixie', 'Test/NY'), { from: at('2026-03-08T07:00:01Z'), count: 2 });
+    expect(isos(runs)).toEqual(['2026-03-08T07:00:00.000Z', '2026-03-08T07:00:00.000Z']);
+    expect(runs.map((r) => r.dst)).toEqual([undefined, 'skipped-adjusted']);
+    expect(runs.map((r) => r.scheduled)).toEqual([undefined, '2026-03-08T02:00:00']);
   });
 
   it('carries the same DST tags as next', () => {

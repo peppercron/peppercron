@@ -7,7 +7,7 @@ import { matches, next, parse, prev } from '../src/index';
 import type { Dialect, Run } from '../src/types';
 import { CORPUS, readJson } from './helpers/corpus';
 
-interface Expected { at: string; local: string; dst?: string }
+interface Expected { at: string; local: string; dst?: string; scheduled?: string }
 interface NextCase {
   id: string;
   dialect: Dialect;
@@ -25,8 +25,12 @@ const Ajv = ((AjvModule as unknown as { default?: unknown }).default ?? AjvModul
 const validate = new Ajv({ allErrors: true }).compile(readJson<object>('schemas/next-case.schema.json'));
 
 const iso = (d: Date) => d.toISOString().replace('.000Z', 'Z');
-const shape = (r: Run): Expected =>
-  r.dst ? { at: iso(r.at), local: r.local, dst: r.dst } : { at: iso(r.at), local: r.local };
+const shape = (r: Run): Expected => ({
+  at: iso(r.at),
+  local: r.local,
+  ...(r.dst ? { dst: r.dst } : {}),
+  ...(r.scheduled ? { scheduled: r.scheduled } : {}),
+});
 
 for (const file of readdirSync(join(CORPUS, 'cases', 'next')).filter((f) => f.endsWith('.json'))) {
   describe(`corpus next: ${file}`, () => {

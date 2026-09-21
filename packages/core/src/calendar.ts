@@ -41,14 +41,19 @@ export function wallSeconds(y: number, m: number, d: number, h: number, mi: numb
 
 const pad = (n: number, width = 2): string => String(n).padStart(width, '0');
 
-export function formatLocal(wallSec: number, offsetSec: number): string {
+/** A wall time as ISO local time with no offset. Used where the wall time has none: a time a gap skipped. */
+export function formatWall(wallSec: number): string {
   const days = floorDiv(wallSec, 86400);
   const tod = wallSec - days * 86400;
   const { y, m, d } = civilFromDays(days);
+  return `${pad(y, 4)}-${pad(m)}-${pad(d)}T${pad(floorDiv(tod, 3600))}:${pad(floorDiv(tod % 3600, 60))}:${pad(tod % 60)}`;
+}
+
+export function formatLocal(wallSec: number, offsetSec: number): string {
   const abs = Math.abs(offsetSec);
   const offS = abs % 60;
   const offset =
     `${offsetSec < 0 ? '-' : '+'}${pad(floorDiv(abs, 3600))}:${pad(floorDiv(abs % 3600, 60))}` +
     (offS ? `:${pad(offS)}` : '');
-  return `${pad(y, 4)}-${pad(m)}-${pad(d)}T${pad(floorDiv(tod, 3600))}:${pad(floorDiv(tod % 3600, 60))}:${pad(tod % 60)}${offset}`;
+  return `${formatWall(wallSec)}${offset}`;
 }
