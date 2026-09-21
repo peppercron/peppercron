@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "family", "fields", "macros", "trailingCommand", "wrapper", "rangeWrap", "singleStep", "star", "domDow", "dstGap", "dstOverlap", "missedRuns", "defaultTimezone"],
+  "required": ["id", "family", "fields", "macros", "trailingCommand", "wrapper", "rangeWrap", "singleStep", "star", "interval", "domDow", "dstGap", "dstOverlap", "missedRuns", "defaultTimezone"],
   "properties": {
     "id": { "description": "Must equal the filename stem and appear in dialects/index.json.", "type": "string", "pattern": "^[a-z][a-z-]*$" },
     "family": { "description": "A family strategy id from strategies.json.", "type": "string" },
@@ -36,10 +36,14 @@
     "rangeWrap": { "description": "What a range whose start is after its end means: a bad-range error, an empty set, or wrapping across the field boundary.", "enum": ["error", "empty", "wrap"] },
     "singleStep": { "description": "What a step after a single value (5/15) means: a bad-step error, or 5 through the field maximum every 15.", "enum": ["error", "to-max"] },
     "star": { "description": "A star strategy id from strategies.json.", "type": "string" },
+    "interval": { "description": "An interval strategy id from strategies.json; `none` for a dialect with no interval form.", "type": "string" },
+    "intervalFirst": { "description": "Which run is the first: `after-anchor` = anchor + one interval (robfig/cron, Kubernetes); `at-anchor` = the anchor itself (EventBridge). Required unless interval is `none`.", "enum": ["after-anchor", "at-anchor"] },
     "domDow": { "description": "A domDow strategy id from strategies.json.", "type": "string" },
     "dstGap": { "description": "A dstGap strategy id from strategies.json.", "type": "string" },
     "dstOverlap": { "description": "A dstOverlap strategy id from strategies.json.", "type": "string" },
     "missedRuns": { "description": "What the reference implementation does with runs missed while it was not running. Recorded for later work; the engine does not read it.", "enum": ["none", "misfire-policy", "starting-deadline", "best-effort", "flexible-window"] },
     "defaultTimezone": { "description": "What the reference implementation assumes when its user names no zone. A fact about the dialect, not about this library: parse here defaults to UTC and a Schedule always carries an explicit zone.", "enum": ["host", "utc"] }
-  }
+  },
+  "if": { "properties": { "interval": { "const": "none" } } },
+  "else": { "required": ["intervalFirst"] }
 }

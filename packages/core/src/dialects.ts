@@ -22,6 +22,10 @@ export interface DialectSpec {
   trailingCommand: boolean;
   /** A keyword the expression may be written inside, as in `cron(...)`; the bare fields parse too. */
   wrapper: string | null;
+  /** An interval strategy id: how this dialect spells "every N from an anchor", or 'none'. */
+  interval: string;
+  /** Whether the first run is the anchor itself or one interval after it. Absent when interval is 'none'. */
+  intervalFirst?: 'after-anchor' | 'at-anchor';
   rangeWrap: 'error' | 'empty' | 'wrap';
   /** What `5/15` means: a parse error (cronie), or 5 through the field maximum every 15 (Quartz). */
   singleStep: 'error' | 'to-max';
@@ -34,7 +38,7 @@ export interface DialectSpec {
   defaultTimezone: string;
 }
 
-export type StrategyAxis = 'family' | 'domDow' | 'star' | 'dstGap' | 'dstOverlap';
+export type StrategyAxis = 'family' | 'domDow' | 'star' | 'interval' | 'dstGap' | 'dstOverlap';
 
 const data = DIALECT_DATA as Record<string, DialectSpec>;
 

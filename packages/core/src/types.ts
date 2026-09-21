@@ -29,20 +29,30 @@ export interface Field {
   star: boolean;
 }
 
+/** A schedule that fires every `seconds` of absolute time from an anchor; time zones and DST do not move it. */
+export interface Interval {
+  seconds: number;
+  /** The interval expression as written, e.g. `@every 1h30m` or `rate(5 minutes)`. */
+  raw: string;
+  span: Span;
+}
+
 export interface Schedule {
   dialect: Dialect;
   source: string;
   timezone: string;
-  /** Dialect field order. Empty only for a macro with no schedule (@reboot). */
+  /** Dialect field order. Empty for a macro with no schedule (@reboot) and for an interval schedule. */
   fields: Field[];
   macro?: string;
   trailing?: { text: string; span: Span };
   candidates?: Dialect[];
+  /** Present for an interval schedule (@every, rate); run times then depend on RunOptions.anchor. */
+  interval?: Interval;
 }
 
 export type ParseErrorCode =
   | 'empty' | 'field-count' | 'bad-token' | 'out-of-range' | 'bad-step'
-  | 'bad-range' | 'unknown-macro' | 'unknown-dialect' | 'bad-timezone' | 'bad-wrapper';
+  | 'bad-range' | 'unknown-macro' | 'unknown-dialect' | 'bad-timezone' | 'bad-wrapper' | 'bad-interval';
 
 export interface ParseError {
   code: ParseErrorCode;

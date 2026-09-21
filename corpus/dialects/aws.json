@@ -12,6 +12,8 @@
   "macros": {},
   "trailingCommand": false,
   "wrapper": "cron",
+  "interval": "aws-rate",
+  "intervalFirst": "at-anchor",
   "rangeWrap": "wrap",
   "singleStep": "to-max",
   "star": "leading",

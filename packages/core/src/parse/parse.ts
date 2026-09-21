@@ -3,6 +3,7 @@ import { fail, ok } from '../result';
 import type { Field, ParseError, ParseOptions, Result, Schedule, Span, Tz } from '../types';
 import { parseField } from './field';
 import { claims, region, unwrap } from './forms';
+import { INTERVALS } from './interval';
 import { tokenize, type Token } from './tokenize';
 
 export type FamilyParser = (
@@ -68,6 +69,12 @@ export const FAMILIES: Record<string, FamilyParser> = {
 function parseAs(spec: DialectSpec, source: string, timezone: string): Result<Schedule, ParseError> {
   const family = FAMILIES[spec.family];
   if (!family) return fail('unknown-dialect', `No parser for dialect family "${spec.family}"`, [0, 0]);
+  const [start, end] = region(source);
+  const form = INTERVALS[spec.interval];
+  if (form && form.claims(source.slice(start, end))) {
+    const interval = form.read(source.slice(start, end), start);
+    return interval.ok ? ok({ dialect: spec.id, source, timezone, fields: [], interval: interval.value }) : interval;
+  }
   const text = unwrap(spec, source);
   if (!text.ok) return text;
   const tokens = tokenize(text.value);

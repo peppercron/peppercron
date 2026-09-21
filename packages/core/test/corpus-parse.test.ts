@@ -13,6 +13,7 @@ interface Summary {
   unsupported?: string[];
   values?: Record<string, number[]>;
   star?: Record<string, boolean>;
+  interval?: { seconds: number };
 }
 
 interface ParseCase {
@@ -28,6 +29,7 @@ interface ParseCase {
 function summarise(s: Schedule, want: Summary): Summary {
   const got: Summary = { dialect: s.dialect };
   if (s.candidates) got.candidates = s.candidates;
+  if (s.interval) got.interval = { seconds: s.interval.seconds };
   const unsupported = s.fields.filter((f) => f.terms.some((t) => t.unsupported)).map((f) => f.name);
   if (unsupported.length > 0) got.unsupported = unsupported;
   const field = (name: string) => s.fields.find((f) => f.name === name);

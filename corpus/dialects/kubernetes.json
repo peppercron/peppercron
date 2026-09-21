@@ -19,6 +19,8 @@
   },
   "trailingCommand": false,
   "wrapper": null,
+  "interval": "go-duration",
+  "intervalFirst": "after-anchor",
   "rangeWrap": "error",
   "singleStep": "to-max",
   "star": "unstepped-term",

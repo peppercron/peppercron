@@ -21,7 +21,7 @@
         "required": ["dialect", "source", "timezone", "fields"]
       },
       "expectSummary": {
-        "description": "A partial expectation, for cases where the whole Schedule would be noise. `dialect` is always compared. `candidates` and `unsupported` are compared exactly, and absent here means absent (or empty) there. `values` and `star` compare only the fields they name.",
+        "description": "A partial expectation, for cases where the whole Schedule would be noise. `dialect` is always compared. `candidates` and `unsupported` are compared exactly, and absent here means absent (or empty) there. `values` and `star` compare only the fields they name. `interval` is compared exactly too.",
         "type": "object",
         "additionalProperties": false,
         "required": ["dialect"],
@@ -30,7 +30,8 @@
           "candidates": { "type": "array", "items": { "type": "string" } },
           "unsupported": { "description": "Names of the fields holding at least one term marked unsupported, in field order.", "type": "array", "items": { "type": "string" } },
           "values": { "description": "Field name to its exact Field.values.", "type": "object", "additionalProperties": { "type": "array", "items": { "type": "integer" } } },
-          "star": { "description": "Field name to its exact Field.star.", "type": "object", "additionalProperties": { "type": "boolean" } }
+          "star": { "description": "Field name to its exact Field.star.", "type": "object", "additionalProperties": { "type": "boolean" } },
+          "interval": { "description": "Compared exactly; absent here means Schedule.interval must be absent.", "type": "object", "additionalProperties": false, "required": ["seconds"], "properties": { "seconds": { "type": "integer", "minimum": 1 } } }
         }
       },
       "expectError": {
@@ -39,7 +40,7 @@
         "additionalProperties": false,
         "required": ["code", "span"],
         "properties": {
-          "code": { "description": "Closed list. A code means no Term could be built; a token this dialect merely does not support is not an error (see tokens in dialect.schema.json).", "enum": ["empty", "field-count", "bad-token", "out-of-range", "bad-step", "bad-range", "unknown-macro", "unknown-dialect", "bad-timezone", "bad-wrapper"] },
+          "code": { "description": "Closed list. A code means no Term could be built; a token this dialect merely does not support is not an error (see tokens in dialect.schema.json).", "enum": ["empty", "field-count", "bad-token", "out-of-range", "bad-step", "bad-range", "unknown-macro", "unknown-dialect", "bad-timezone", "bad-wrapper", "bad-interval"] },
           "span": { "description": "[start, end) character offsets into `input`, as UTF-16 code units. A port whose strings are bytes or code points must convert.", "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }
         }
       },

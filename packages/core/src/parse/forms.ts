@@ -1,6 +1,7 @@
 import type { DialectSpec } from '../dialects';
 import { fail, ok } from '../result';
 import type { ParseError, Result, Span } from '../types';
+import { INTERVALS } from './interval';
 
 /** [start, end) of the input without its surrounding whitespace. */
 export function region(source: string): Span {
@@ -8,9 +9,12 @@ export function region(source: string): Span {
   return [start, Math.max(start, source.trimEnd().length)];
 }
 
+const wrapped = (spec: DialectSpec, source: string): boolean =>
+  spec.wrapper !== null && source.trimStart().startsWith(`${spec.wrapper}(`);
+
 /** True when the input is written in a form only some dialects have, so detection asks only them. */
 export function claims(spec: DialectSpec, source: string): boolean {
-  return spec.wrapper !== null && source.trimStart().startsWith(`${spec.wrapper}(`);
+  return (INTERVALS[spec.interval]?.claims(source.trimStart()) ?? false) || wrapped(spec, source);
 }
 
 /**
@@ -18,7 +22,7 @@ export function claims(spec: DialectSpec, source: string): boolean {
  * off, so every span the tokenizer reports still indexes the untouched input.
  */
 export function unwrap(spec: DialectSpec, source: string): Result<string, ParseError> {
-  if (spec.wrapper === null || !claims(spec, source)) return ok(source);
+  if (spec.wrapper === null || !wrapped(spec, source)) return ok(source);
   const [start, end] = region(source);
   const open = start + spec.wrapper.length + 1;
   const inner = source.slice(open, end - 1);

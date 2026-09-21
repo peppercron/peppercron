@@ -21,6 +21,14 @@ describe('claims', () => {
     expect(claims(aws, 'CRON(0 12 * * ? *)')).toBe(false);
     expect(claims(vixie, 'cron(0 12 * * ? *)')).toBe(false);
   });
+
+  it('is true for a dialect whose interval form opens the input', () => {
+    const k8s = getDialect('kubernetes')!;
+    expect(claims(k8s, '@every 1h')).toBe(true);
+    expect(claims(k8s, '@daily')).toBe(false);
+    expect(claims(aws, 'rate(5 minutes)')).toBe(true);
+    expect(claims(vixie, '@every 1h')).toBe(false);
+  });
 });
 
 describe('unwrap', () => {

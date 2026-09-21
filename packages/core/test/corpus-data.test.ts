@@ -31,7 +31,7 @@ describe('corpus data', () => {
     const listed = readJson<Record<string, string[]>>('strategies.json');
     for (const id of readJson<string[]>('dialects/index.json')) {
       const d = readJson<Record<string, string>>(`dialects/${id}.json`);
-      for (const axis of ['family', 'domDow', 'star', 'dstGap', 'dstOverlap']) {
+      for (const axis of ['family', 'domDow', 'star', 'interval', 'dstGap', 'dstOverlap']) {
         expect(listed[axis], `${id}.${axis}`).toContain(d[axis]);
       }
     }

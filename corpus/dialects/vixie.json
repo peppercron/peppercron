@@ -20,6 +20,7 @@
   },
   "trailingCommand": true,
   "wrapper": null,
+  "interval": "none",
   "rangeWrap": "empty",
   "singleStep": "error",
   "star": "leading",

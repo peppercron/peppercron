@@ -13,6 +13,7 @@
   "macros": {},
   "trailingCommand": false,
   "wrapper": null,
+  "interval": "none",
   "rangeWrap": "wrap",
   "singleStep": "to-max",
   "star": "leading",
