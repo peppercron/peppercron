@@ -9,6 +9,9 @@ describe('intlTz', () => {
     expect(intlTz.isValid('UTC')).toBe(true);
     expect(intlTz.isValid('Mars/Phobos')).toBe(false);
     expect(intlTz.isValid('')).toBe(false);
+    // Intl reads a non-string as "the host default", which would make a pure function host-dependent.
+    expect(intlTz.isValid(undefined as unknown as string)).toBe(false);
+    expect(intlTz.isValid(null as unknown as string)).toBe(false);
   });
 
   it('reports offsets in seconds east of UTC', () => {

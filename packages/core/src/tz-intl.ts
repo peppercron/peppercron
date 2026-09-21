@@ -5,24 +5,25 @@ const DAY = 86400;
 /** Transitions are discovered and cached in 64-day chunks: chunk k owns (k*CHUNK, (k+1)*CHUNK]. */
 const CHUNK = 64 * DAY;
 
-const formats = new Map<string, Intl.DateTimeFormat | null>();
+const formats = new Map<string, Intl.DateTimeFormat>();
 const chunks = new Map<string, Transition[]>();
 
 function format(zone: string): Intl.DateTimeFormat | null {
-  let f = formats.get(zone);
-  if (f === undefined) {
-    try {
-      f = new Intl.DateTimeFormat('en-US', {
-        timeZone: zone, hourCycle: 'h23',
-        year: 'numeric', month: 'numeric', day: 'numeric',
-        hour: 'numeric', minute: 'numeric', second: 'numeric',
-      });
-    } catch {
-      f = null;
-    }
-    formats.set(zone, f);
+  const cached = formats.get(zone);
+  if (cached) return cached;
+  let made: Intl.DateTimeFormat;
+  try {
+    made = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone, hourCycle: 'h23',
+      year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric',
+    });
+  } catch {
+    // Deliberately not cached: a server validating untrusted zone names would grow the map without bound.
+    return null;
   }
-  return f;
+  formats.set(zone, made);
+  return made;
 }
 
 function offsetAt(zone: string, sec: number): number {
@@ -69,7 +70,9 @@ function scanChunk(zone: string, k: number): Transition[] {
 }
 
 export const intlTz: Tz = {
-  isValid: (zone) => zone !== '' && format(zone) !== null,
+  // Intl reads anything but a non-empty string as "the host default zone", which would make a schedule
+  // carrying no timezone resolve against the machine it happens to run on.
+  isValid: (zone) => typeof zone === 'string' && zone !== '' && format(zone) !== null,
   offsetAt,
   transitions(zone, fromSec, toSec) {
     if (toSec <= fromSec || zone === 'UTC' || zone === 'Etc/UTC' || !format(zone)) return [];

@@ -17,6 +17,8 @@ const LOOKBACK = 2 * 86400;
 const LEAF = 3600;
 const DEFAULT_COUNT = 10;
 const MAX_COUNT = 1000;
+/** The largest instant a Date holds (8.64e15 ms), in seconds. Past it, new Date() is an Invalid Date. */
+const MAX_DATE_SEC = 8.64e12;
 
 /**
  * The wall seconds a gap skipped that this schedule should be caught up on, ascending: one catch-up run
@@ -216,21 +218,24 @@ export function createEngine(
     }
   }
 
-  function next(s: Schedule | string, opts: RunOptions = {}): Run[] {
+  function next(s: Schedule | string, opts?: RunOptions | null): Run[] {
+    const o = opts ?? {};
     const p = prepare(s);
-    const fromMs = toMs(opts.from ?? new Date());
+    const fromMs = toMs(o.from ?? new Date());
     if (!p || Number.isNaN(fromMs)) return [];
 
     const sec = Math.floor(fromMs / 1000);
-    const start = opts.inclusive && fromMs % 1000 === 0 ? sec : sec + 1;
+    const start = o.inclusive && fromMs % 1000 === 0 ? sec : sec + 1;
     let end = start + HORIZON;
-    if (opts.until !== undefined) {
-      const untilMs = toMs(opts.until);
+    if (o.until !== undefined) {
+      const untilMs = toMs(o.until);
       if (Number.isNaN(untilMs)) return [];
       end = Math.min(end, Math.floor(untilMs / 1000));
     }
+    // Stop the walk where Date stops: a run past this would carry an Invalid Date.
+    end = Math.min(end, MAX_DATE_SEC);
 
-    const count = clampCount(opts.count);
+    const count = clampCount(o.count);
     const out: Run[] = [];
     for (const r of guarded(walk(p.c, p.spec, tz, p.zone, start, end))) {
       out.push(toRun(r));
@@ -239,23 +244,27 @@ export function createEngine(
     return out;
   }
 
-  function prev(s: Schedule | string, opts: RunOptions = {}): Run[] {
+  function prev(s: Schedule | string, opts?: RunOptions | null): Run[] {
+    const o = opts ?? {};
     const p = prepare(s);
-    const fromMs = toMs(opts.from ?? new Date());
+    const fromMs = toMs(o.from ?? new Date());
     if (!p || Number.isNaN(fromMs)) return [];
 
     const sec = Math.floor(fromMs / 1000);
-    const end = fromMs % 1000 === 0 && !opts.inclusive ? sec - 1 : sec;
+    let end = fromMs % 1000 === 0 && !o.inclusive ? sec - 1 : sec;
     let floor = end - HORIZON;
-    if (opts.until !== undefined) {
-      const untilMs = toMs(opts.until);
+    if (o.until !== undefined) {
+      const untilMs = toMs(o.until);
       if (Number.isNaN(untilMs)) return [];
       floor = Math.max(floor, Math.ceil(untilMs / 1000));
     }
+    // Stop the walk where Date stops: a run outside this would carry an Invalid Date.
+    end = Math.min(end, MAX_DATE_SEC);
+    floor = Math.max(floor, -MAX_DATE_SEC);
 
     // The same forward walk, over halves of [floor, end], so prev agrees with next by construction.
     const runs = (a: number, b: number) => guarded(walk(p.c, p.spec, tz, p.zone, a, b));
-    return collectLatest(runs, floor, end, clampCount(opts.count)).reverse().map(toRun);
+    return collectLatest(runs, floor, end, clampCount(o.count)).reverse().map(toRun);
   }
 
   function matches(s: Schedule | string, at: Date): boolean {

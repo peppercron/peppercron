@@ -20,4 +20,15 @@ describe('public entry point', () => {
   it('exports createCore and intlTz for callers that inject their own provider', () => {
     expect(typeof createCore(intlTz).next).toBe('function');
   });
+
+  it('gives no runs for a hand-built Schedule with no timezone rather than falling back to the host', () => {
+    const parsed = parse('0 2 * * 1', { dialect: 'vixie' });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const zoneless = { ...parsed.value, timezone: undefined as unknown as string };
+    const from = new Date('2026-09-21T00:00:00Z');
+    expect(next(zoneless, { from })).toEqual([]);
+    expect(prev(zoneless, { from })).toEqual([]);
+    expect(matches(zoneless, new Date('2026-09-21T02:00:00Z'))).toBe(false);
+  });
 });

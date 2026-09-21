@@ -219,6 +219,19 @@ describe('hostile input', () => {
     expect(core.matches(foreign, at('2026-09-21T02:00:00Z'))).toBe(false);
   });
 
+  it('treats a null options object as no options (Ruling 11 class)', () => {
+    expect(core.next('0 2 * * 1', null as unknown as undefined)).toHaveLength(10);
+    expect(core.prev('0 2 * * 1', null as unknown as undefined)).toHaveLength(10);
+    expect(core.parse('0 2 * * 1', null as unknown as undefined).ok).toBe(true);
+  });
+
+  it('never returns a run whose instant a Date cannot hold', () => {
+    // 8.64e15 ms is the largest instant a Date represents; every run past it used to be an Invalid Date.
+    expect(core.next('* * * * *', { from: new Date(8.64e15) })).toEqual([]);
+    expect(core.next('* * * * *', { from: new Date(8.64e15), inclusive: true })
+      .every((r) => !Number.isNaN(r.at.getTime()))).toBe(true);
+  });
+
   it('returns empty results for unparseable strings, @reboot and junk objects', () => {
     expect(core.next('not a cron', { from })).toEqual([]);
     expect(core.matches('not a cron', from)).toBe(false);

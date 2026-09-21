@@ -89,17 +89,18 @@ function detect(source: string, tokens: Token[], timezone: string): Result<Sched
 }
 
 export function createParser(tz: Tz) {
-  return function parse(input: string, opts: ParseOptions = {}): Result<Schedule, ParseError> {
+  return function parse(input: string, opts?: ParseOptions | null): Result<Schedule, ParseError> {
+    const o = opts ?? {};
     const tokens = tokenize(input);
     if (tokens.length === 0) return fail('empty', 'The expression is empty', [0, input.length]);
 
-    const timezone = opts.timezone ?? 'UTC';
+    const timezone = o.timezone ?? 'UTC';
     if (!tz.isValid(timezone)) return fail('bad-timezone', `Unknown timezone "${timezone}"`, [0, 0]);
 
-    if (opts.dialect === undefined) return detect(input, tokens, timezone);
+    if (o.dialect === undefined) return detect(input, tokens, timezone);
 
-    const spec = getDialect(opts.dialect);
-    if (!spec) return fail('unknown-dialect', `Unknown dialect "${String(opts.dialect)}"`, [0, 0]);
+    const spec = getDialect(o.dialect);
+    if (!spec) return fail('unknown-dialect', `Unknown dialect "${String(o.dialect)}"`, [0, 0]);
     return parseAs(spec, input, tokens, timezone);
   };
 }
