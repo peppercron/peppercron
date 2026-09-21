@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "dialect", "input", "timezone", "from", "count", "expect", "provenance"],
+    "properties": {
+      "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "dialect": { "type": "string" },
+      "input": { "type": "string" },
+      "timezone": { "type": "string" },
+      "from": { "$ref": "#/definitions/instant" },
+      "until": { "$ref": "#/definitions/instant" },
+      "count": { "type": "integer", "minimum": 1, "maximum": 1000 },
+      "expect": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["at", "local"],
+          "properties": {
+            "at": { "$ref": "#/definitions/instant" },
+            "local": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}(:\\d{2})?$" },
+            "dst": { "enum": ["skipped-adjusted", "ambiguous-first", "ambiguous-second"] }
+          }
+        }
+      },
+      "notMatching": { "type": "array", "items": { "$ref": "#/definitions/instant" } },
+      "skipDerived": { "type": "boolean" },
+      "provenance": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": { "enum": ["spec", "derived", "captured"] },
+          "source": { "type": "string" },
+          "platform": { "type": "string" },
+          "recording": { "type": "string" }
+        },
+        "allOf": [
+          { "if": { "properties": { "kind": { "const": "derived" } } }, "then": { "required": ["source"] } },
+          { "if": { "properties": { "kind": { "const": "captured" } } }, "then": { "required": ["platform", "recording"] } }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "instant": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" }
+  }
+}

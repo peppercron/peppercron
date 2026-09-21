@@ -1,0 +1,166 @@
+[
+  {
+    "id": "vixie-weekly", "dialect": "vixie", "input": "0 2 * * 1", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-09-21T02:00:00Z", "local": "2026-09-21T02:00:00+00:00" },
+      { "at": "2026-09-28T02:00:00Z", "local": "2026-09-28T02:00:00+00:00" },
+      { "at": "2026-10-05T02:00:00Z", "local": "2026-10-05T02:00:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-dom-dow-or", "dialect": "vixie", "input": "0 9 1 * 1", "timezone": "UTC",
+    "from": "2026-09-21T10:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-09-28T09:00:00Z", "local": "2026-09-28T09:00:00+00:00" },
+      { "at": "2026-10-01T09:00:00Z", "local": "2026-10-01T09:00:00+00:00" },
+      { "at": "2026-10-05T09:00:00Z", "local": "2026-10-05T09:00:00+00:00" }
+    ],
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H5" }
+  },
+  {
+    "id": "vixie-star-step-dom-is-and", "dialect": "vixie", "input": "0 0 */2 * 1", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-10-05T00:00:00Z", "local": "2026-10-05T00:00:00+00:00" },
+      { "at": "2026-10-19T00:00:00Z", "local": "2026-10-19T00:00:00+00:00" },
+      { "at": "2026-11-09T00:00:00Z", "local": "2026-11-09T00:00:00+00:00" }
+    ],
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H5" }
+  },
+  {
+    "id": "vixie-never-fires", "dialect": "vixie", "input": "0 0 31 4 *", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-reversed-range-never-fires", "dialect": "vixie", "input": "0 22-2 * * *", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [],
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H3" }
+  },
+  {
+    "id": "vixie-feb-29-within-horizon", "dialect": "vixie", "input": "0 0 29 2 *", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [{ "at": "2028-02-29T00:00:00Z", "local": "2028-02-29T00:00:00+00:00" }],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-hourly-until", "dialect": "vixie", "input": "0 * * * *", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "until": "2026-09-21T02:00:00Z", "count": 10,
+    "expect": [
+      { "at": "2026-09-21T01:00:00Z", "local": "2026-09-21T01:00:00+00:00" },
+      { "at": "2026-09-21T02:00:00Z", "local": "2026-09-21T02:00:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "vixie-daily-macro-in-kolkata", "dialect": "vixie", "input": "@daily", "timezone": "Asia/Kolkata",
+    "from": "2026-09-21T00:00:00Z", "count": 2,
+    "expect": [
+      { "at": "2026-09-21T18:30:00Z", "local": "2026-09-22T00:00:00+05:30" },
+      { "at": "2026-09-22T18:30:00Z", "local": "2026-09-23T00:00:00+05:30" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-last-day-of-month", "dialect": "quartz", "input": "0 0 12 L * ?", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-09-30T12:00:00Z", "local": "2026-09-30T12:00:00+00:00" },
+      { "at": "2026-10-31T12:00:00Z", "local": "2026-10-31T12:00:00+00:00" },
+      { "at": "2026-11-30T12:00:00Z", "local": "2026-11-30T12:00:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-three-before-last-day", "dialect": "quartz", "input": "0 0 12 L-3 * ?", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-09-27T12:00:00Z", "local": "2026-09-27T12:00:00+00:00" },
+      { "at": "2026-10-28T12:00:00Z", "local": "2026-10-28T12:00:00+00:00" },
+      { "at": "2026-11-27T12:00:00Z", "local": "2026-11-27T12:00:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-third-friday", "dialect": "quartz", "input": "0 0 12 ? * 6#3", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-10-16T12:00:00Z", "local": "2026-10-16T12:00:00+00:00" },
+      { "at": "2026-11-20T12:00:00Z", "local": "2026-11-20T12:00:00+00:00" },
+      { "at": "2026-12-18T12:00:00Z", "local": "2026-12-18T12:00:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-last-friday", "dialect": "quartz", "input": "0 0 12 ? * 6L", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-09-25T12:00:00Z", "local": "2026-09-25T12:00:00+00:00" },
+      { "at": "2026-10-30T12:00:00Z", "local": "2026-10-30T12:00:00+00:00" },
+      { "at": "2026-11-27T12:00:00Z", "local": "2026-11-27T12:00:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-nearest-weekday-to-15th", "dialect": "quartz", "input": "0 0 12 15W * ?", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-10-15T12:00:00Z", "local": "2026-10-15T12:00:00+00:00" },
+      { "at": "2026-11-16T12:00:00Z", "local": "2026-11-16T12:00:00+00:00" },
+      { "at": "2026-12-15T12:00:00Z", "local": "2026-12-15T12:00:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-last-weekday-of-month", "dialect": "quartz", "input": "0 0 12 LW * ?", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-09-30T12:00:00Z", "local": "2026-09-30T12:00:00+00:00" },
+      { "at": "2026-10-30T12:00:00Z", "local": "2026-10-30T12:00:00+00:00" },
+      { "at": "2026-11-30T12:00:00Z", "local": "2026-11-30T12:00:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-31w-skips-short-months", "dialect": "quartz", "input": "0 0 12 31W * ?", "timezone": "UTC",
+    "from": "2026-09-01T00:00:00Z", "count": 2,
+    "expect": [
+      { "at": "2026-10-30T12:00:00Z", "local": "2026-10-30T12:00:00+00:00" },
+      { "at": "2026-12-31T12:00:00Z", "local": "2026-12-31T12:00:00+00:00" }
+    ],
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H8" }
+  },
+  {
+    "id": "quartz-year-field", "dialect": "quartz", "input": "0 0 0 1 1 ? 2028", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [{ "at": "2028-01-01T00:00:00Z", "local": "2028-01-01T00:00:00+00:00" }],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-every-twenty-seconds", "dialect": "quartz", "input": "0/20 * * * * ?", "timezone": "UTC",
+    "from": "2026-09-21T00:00:00Z", "count": 3,
+    "expect": [
+      { "at": "2026-09-21T00:00:20Z", "local": "2026-09-21T00:00:20+00:00" },
+      { "at": "2026-09-21T00:00:40Z", "local": "2026-09-21T00:00:40+00:00" },
+      { "at": "2026-09-21T00:01:00Z", "local": "2026-09-21T00:01:00+00:00" }
+    ],
+    "provenance": { "kind": "spec" }
+  },
+  {
+    "id": "quartz-wrapped-hour-range", "dialect": "quartz", "input": "0 0 22-2 * * ?", "timezone": "UTC",
+    "from": "2026-09-21T21:30:00Z", "count": 6,
+    "expect": [
+      { "at": "2026-09-21T22:00:00Z", "local": "2026-09-21T22:00:00+00:00" },
+      { "at": "2026-09-21T23:00:00Z", "local": "2026-09-21T23:00:00+00:00" },
+      { "at": "2026-09-22T00:00:00Z", "local": "2026-09-22T00:00:00+00:00" },
+      { "at": "2026-09-22T01:00:00Z", "local": "2026-09-22T01:00:00+00:00" },
+      { "at": "2026-09-22T02:00:00Z", "local": "2026-09-22T02:00:00+00:00" },
+      { "at": "2026-09-22T22:00:00Z", "local": "2026-09-22T22:00:00+00:00" }
+    ],
+    "provenance": { "kind": "derived", "source": "corpus/DERIVATION.md H3" }
+  }
+]
