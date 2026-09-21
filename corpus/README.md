@@ -325,7 +325,7 @@ Trimming, and every other mention of whitespace above (left-trimming before the 
 the trimmed input the wrapper and the `family` parser both see), use the same whitespace set as
 Tokenizing: JavaScript's `\s`, which includes U+FEFF. Go's `strings.TrimSpace` does not strip U+FEFF,
 so a port must use the listed set, not its own language's idea of whitespace, or it will disagree on
-an input like `"﻿cron(0 12 * * ? *)"`.
+an input that starts with a U+FEFF byte-order mark before `cron(0 12 * * ? *)`.
 
 **Claimed-form detection.** A dialect *claims* an input when step 1 or step 2 above would apply to it
 for that dialect: its own interval strategy claims the text, or the text is wrapped in its own
@@ -546,16 +546,16 @@ Every behaviour pinned only by an `assumed` case, in one place. Found by searchi
    invocation is at the anchor instant or one interval after it. Assumed at-anchor: the first run is the
    anchor instant itself (`intervalFirst: "at-anchor"`). Case: `aws-rate-first-run-is-the-anchor`.
 10. **A13 - AWS's default time zone.** The `ScheduleExpressionTimezone`/`ScheduleExpressionTimeZone`
-   parameter is documented as optional with no default value stated. Assumed UTC
-   (`defaultTimezone: "utc"`). No case rests on this one: it is a fact about the *reference* platform's
-   own default, recorded on the dialect for a future port to reproduce; this library's own `parse`
-   always defaults every dialect's `timezone` to UTC regardless, so nothing here distinguishes AWS's
-   assumed default from any other dialect's.
+    parameter is documented as optional with no default value stated. Assumed UTC
+    (`defaultTimezone: "utc"`). No case rests on this one: it is a fact about the *reference* platform's
+    own default, recorded on the dialect for a future port to reproduce; this library's own `parse`
+    always defaults every dialect's `timezone` to UTC regardless, so nothing here distinguishes AWS's
+    assumed default from any other dialect's.
 11. **A16 - whether AWS's DST rule is fixed-time-only.** The DST section's only worked example is a
-   single fixed-time schedule; there is no wildcard example for either the gap or the overlap. Assumed
-   the documented fixed-time rule applies to every schedule alike - skip a wall time in a gap, fire once
-   on the first pass of an overlap (strategy `once-first`, and `dstGap: "skip"` needs no schedule-shape
-   test to begin with). Case: `aws-overlap-wildcard-fires-on-the-first-pass-only`.
+    single fixed-time schedule; there is no wildcard example for either the gap or the overlap. Assumed
+    the documented fixed-time rule applies to every schedule alike - skip a wall time in a gap, fire once
+    on the first pass of an overlap (strategy `once-first`, and `dstGap: "skip"` needs no schedule-shape
+    test to begin with). Case: `aws-overlap-wildcard-fires-on-the-first-pass-only`.
 
 ## Known deviations from the reference implementations
 
@@ -625,7 +625,7 @@ not the reference, and should carry this list forward.
     literal prefix, so anything else there - no space, two spaces, a tab, a leading space before `@every`
     itself - falls through to `unrecognized descriptor` or the five-field parser instead. Here `@every`
     accepts one or more of the same whitespace characters listed under Tokenizing both before the
-    duration and around the whole macro (`@every  5m`, `@every\t5m`, `@every 5m`, ` @every 5m` and
+    duration and around the whole macro (`@every  5m`, `@every\t5m`, `@every` + a U+00A0 non-breaking space + `5m`, ` @every 5m` and
     `@every 5m ` all parse to the same 300-second interval).
 14. **AWS requires the `cron(...)` wrapper at the API level; this corpus also accepts the bare six
     fields.** Every documented example wraps the expression, and the wrapper "is required at the API
