@@ -4,7 +4,7 @@ Parse cron schedules and compute when they run, correctly across timezones and D
 
 - Zero runtime dependencies. Works in Node and in the browser.
 - Never throws. `parse` returns a result; `next`, `prev` and `matches` return `[]` or `false` for input they cannot use.
-- DST behaviour follows what each scheduler really does, derived from the cronie and Quartz source, not a guess.
+- DST behaviour follows what each scheduler really does: derived from the cronie, Quartz and robfig/cron source where there is one, and from GitHub's and AWS's own documentation where there is not - with every remaining gap written down as an explicit assumption rather than a guess (see the corpus [Assumptions list](../../corpus/README.md#assumptions)).
 - Every parsed field and term carries its character span in the source, for editors and error underlines.
 - About 7 KB gzipped.
 
@@ -12,9 +12,9 @@ Five dialects are supported. `describe`, `lint` and `convert` are planned.
 
 | Dialect | What it is | A run in a gap (spring forward) | A run in an overlap (fall back) |
 | --- | --- | --- | --- |
-| `vixie` | Linux crontab, matching cronie | A fixed-time job catches up, once per skipped wall time it matches | A fixed-time job fires once, on the first pass |
+| `vixie` | Linux crontab, matching cronie | A fixed-time job catches up, once per skipped wall time it matches | A fixed-time job fires once, on the first pass; a wildcard job on both |
 | `kubernetes` | A CronJob's `spec.schedule` (robfig/cron v3, as pinned by Kubernetes) | Silently skipped - no run, no catch-up | Fires twice, once on each pass |
-| `github-actions` | A workflow's `on.schedule` `cron:` entry | A fixed-time job advances to the next valid time, once per gap | A fixed-time job fires once, on the first pass |
+| `github-actions` | A workflow's `on.schedule` `cron:` entry | A fixed-time job advances to the next valid time, once per gap | A fixed-time job fires once, on the first pass; a wildcard job on both |
 | `quartz` | Java Quartz's `CronExpression` | Skipped - no run | Fires once, on the second pass |
 | `aws` | EventBridge's `cron(...)` and `rate(...)` | Skipped - no run | Fires once, on the first pass |
 
@@ -123,36 +123,44 @@ An interval schedule's runs are pure arithmetic - `anchor + k * interval.seconds
 
 ```ts
 const k = parse('@every 5m', { dialect: 'kubernetes' });
-next(k.value, { from: new Date('2026-09-21T10:00:00Z'), count: 2 });
-// no anchor given, so it defaults to `from`:
-// [ { at: 2026-09-21T10:05:00.000Z, local: '2026-09-21T10:05:00+00:00' },
-//   { at: 2026-09-21T10:10:00.000Z, local: '2026-09-21T10:10:00+00:00' } ]
+if (k.ok) {
+  next(k.value, { from: new Date('2026-09-21T10:00:00Z'), count: 2 });
+  // no anchor given, so it defaults to `from`:
+  // [ { at: 2026-09-21T10:05:00.000Z, local: '2026-09-21T10:05:00+00:00' },
+  //   { at: 2026-09-21T10:10:00.000Z, local: '2026-09-21T10:10:00+00:00' } ]
 
-matches(k.value, new Date('2026-09-21T10:05:00Z'));                                    // false - no anchor
-matches(k.value, new Date('2026-09-21T10:05:00Z'), { anchor: new Date('2026-09-21T10:00:00Z') }); // true
+  matches(k.value, new Date('2026-09-21T10:05:00Z'));                                    // false - no anchor
+  matches(k.value, new Date('2026-09-21T10:05:00Z'), { anchor: new Date('2026-09-21T10:00:00Z') }); // true
+}
 ```
 
-`prev` and `matches` need a **real** anchor the same way `next` does - without one, `matches` on an interval schedule is always `false`, since there is no default run sequence to test an instant against.
+`matches` has no `from` to default the anchor to, so without one it is always `false`. `prev` *does* default it to `from`, which makes it degenerate there: every run of the sequence is at or after the anchor, so `prev` on an interval schedule with no anchor returns `[]` - except an `at-anchor` dialect (AWS) with `inclusive: true`, which returns the anchor instant itself, since that one run is not strictly before `from`. Pass a real anchor to either when you mean it.
 
 Kubernetes and AWS disagree on which run is first. Kubernetes's `@every` fires one interval *after* the anchor; AWS's `rate(...)` fires *at* the anchor itself:
 
 ```ts
 const anchor = new Date('2026-09-21T10:00:00Z');
-next(parse('@every 5m', { dialect: 'kubernetes' }).value, { anchor, from: anchor, inclusive: true, count: 1 });
-// [ { at: 2026-09-21T10:05:00.000Z, local: '2026-09-21T10:05:00+00:00' } ]  -- one interval after the anchor
+const k2 = parse('@every 5m', { dialect: 'kubernetes' });
+const a2 = parse('rate(5 minutes)', { dialect: 'aws' });
+if (k2.ok && a2.ok) {
+  next(k2.value, { anchor, from: anchor, inclusive: true, count: 1 });
+  // [ { at: 2026-09-21T10:05:00.000Z, local: '2026-09-21T10:05:00+00:00' } ]  -- one interval after the anchor
 
-next(parse('rate(5 minutes)', { dialect: 'aws' }).value, { anchor, from: anchor, inclusive: true, count: 1 });
-// [ { at: 2026-09-21T10:00:00.000Z, local: '2026-09-21T10:00:00+00:00' } ]  -- the anchor itself
+  next(a2.value, { anchor, from: anchor, inclusive: true, count: 1 });
+  // [ { at: 2026-09-21T10:00:00.000Z, local: '2026-09-21T10:00:00+00:00' } ]  -- the anchor itself
+}
 ```
 
 Intervals ignore time zones and DST entirely - `rate(1 day)` is a fixed 24 hours of absolute time, not "the same wall clock time tomorrow":
 
 ```ts
 const s = parse('rate(1 day)', { dialect: 'aws', timezone: 'America/New_York' });
-const a = new Date('2026-03-07T17:00:00Z'); // 12:00 EST, the day before a spring-forward
-next(s.value, { anchor: a, from: a, count: 2 });
-// [ { at: 2026-03-08T17:00:00.000Z, local: '2026-03-08T13:00:00-04:00' },  -- 24h later, now 13:00 local (DST shifted the wall clock)
-//   { at: 2026-03-09T17:00:00.000Z, local: '2026-03-09T13:00:00-04:00' } ]
+if (s.ok) {
+  const a = new Date('2026-03-07T17:00:00Z'); // 12:00 EST, the day before a spring-forward
+  next(s.value, { anchor: a, from: a, count: 2 });
+  // [ { at: 2026-03-08T17:00:00.000Z, local: '2026-03-08T13:00:00-04:00' },  -- 24h later, now 13:00 local (DST shifted the wall clock)
+  //   { at: 2026-03-09T17:00:00.000Z, local: '2026-03-09T13:00:00-04:00' } ]
+}
 ```
 
 ## DST

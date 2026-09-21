@@ -122,8 +122,11 @@ disagree on what counts, so the same expression can be a star under one and not 
 ### `domDow` - combining day-of-month with day-of-week
 
 Each side reports `hit` (does this day match?) and `star` (the field's `Field.star`, from the
-dialect's own `star` strategy above - **not** a fixed leading-`*` test). A `?` term makes its side
-`hit: true, star: true` regardless of the dialect's `star` strategy.
+dialect's own `star` strategy above - **not** a fixed leading-`*` test). An `unspecified` (`?`) term
+makes its side `hit: true, star: true` unconditionally (`matcher.ts`'s `domSide`/`dowSide` shortcut on
+`kind === 'unspecified'`) - this is separate from the `star` strategies above and from the `?*` token
+(Kubernetes), where `?` instead parses to an `any` term and is a star only because `any` with no step
+is a star under `unstepped-term`, not because of this rule.
 
 - **`or`** (cronie, GitHub Actions, Kubernetes) - if *either* field is a star, the pair is AND;
   otherwise it is OR. So vixie's `0 0 13 * 5` fires on the 13th *and* on every Friday, while
@@ -148,8 +151,9 @@ segment's first: for a 1-hour spring forward at 02:00, the wall times `[02:00:00
   just quietly loses that day's run, the flat opposite of cronie's `vixie-window`. DERIVATION H4, K11,
   A14.
 - **`vixie-window`** (cronie) - catch-up, under two conditions:
-  1. the schedule is **fixed-time**: neither the minute nor the hour field begins with `*` (H1 - a
-     purely syntactic test, so `*/5` counts as a wildcard and `0-59` does not); and
+  1. the schedule is **fixed-time**: neither the minute nor the hour field is a star, under the
+     `leading` star strategy vixie uses (H1 - a purely syntactic test, so `*/5` counts as a wildcard and
+     `0-59` does not); and
   2. the gap is **shorter than 3 hours**. cronie walks the skipped minutes one at a time only in its
      `case medium`, bounded by `3 * MINUTE_COUNT` = 180 minutes; a wider jump resyncs and runs only
      the current minute (H2). So a zone that skips a whole wall day, as Pacific/Apia did on
@@ -165,8 +169,12 @@ segment's first: for a 1-hour spring forward at 02:00, the wall times `[02:00:00
   skips: the run fires at the transition instant, tagged `skipped-adjusted`, with `scheduled` set to
   the **earliest** matching wall time in the gap - unlike `vixie-window`, later matches in the same gap
   are not each given their own run. **No** run at all when a natural run already fires at the
-  transition instant (GitHub's own documented example, `2:30 -> 3:00`, is exactly this: the 3:00 run is
-  natural, so there is no separate advanced run). No width limit on the gap. DERIVATION G5.
+  transition instant - the advanced run is never a second run at an instant the schedule already
+  matches (`0 2,3 * * *` across a 02:00 gap yields one **untagged** 03:00 run, not an advanced one as
+  well; case `github-gap-natural-run-is-not-doubled`). GitHub's own documented example, `2:30 -> 3:00`,
+  is the *other* side of the rule: `30 2 * * *` does not match 03:00, so the advanced run **is**
+  emitted there, tagged `skipped-adjusted` with `scheduled: 2026-03-08T02:30:00` (case
+  `github-gap-fixed-time-advances-to-the-next-valid-time`). No width limit on the gap. DERIVATION G5.
 
 **The natural run** (`vixie-window`). Catch-up runs are *extra*. If the schedule also matches the wall
 time the transition instant lands on, that run is emitted too - **after** the catch-up runs, at the
@@ -203,29 +211,41 @@ no `fields`, and `Schedule.interval = { seconds, raw, span }` is set instead (se
 `seconds` is always a positive integer of whole seconds; the run-time semantics that turn it into actual
 runs are in "Run-time semantics" further down. `none` marks a dialect with no interval form at all.
 
-- **`go-duration`** (`@every <duration>`, Kubernetes/robfig) - the text after `@every ` and one or more
-  spaces, read as Go's `time.ParseDuration`: `([-+]?(\d*(\.\d*)?)(ns|us|µs|μs|ms|s|m|h))+`, or a bare
-  `0`. There is no day or week unit. Each unit term contributes `intPart * unitNs` plus, for a
-  fractional part, `floor(float64(fraction) * (unitNs / 10^digits))` - Go computes the fractional
-  nanoseconds as a `float64` multiplication, truncated, not as exact decimal arithmetic, and this is
-  mirrored exactly (not simplified to an equivalent-looking integer computation) because the two can
-  disagree by a nanosecond near a rounding boundary. Terms accumulate in order; the running total must
-  stay **below 2^63 nanoseconds** (Go's `int64` duration range) after every term or the whole thing is
-  `bad-interval`. Once total nanoseconds are known: a duration under 1 second is clamped **up** to 1
-  second, then the result is truncated **down** to whole seconds (`@every 1500ms` -> 1s, not 2s; `@every
-  -1h` -> 1s, since a negative delay is also clamped up). `@every` with no duration, or one
-  `time.ParseDuration` cannot read, is `bad-interval`. DERIVATION K7.
-- **`aws-rate`** (`rate(value unit)`, AWS EventBridge) - `value` a run of 1-15 digits read as an
+- **`go-duration`** (`@every <duration>`, Kubernetes/robfig) - `@every`, one or more whitespace
+  characters, then **one whitespace-free token**, read as Go's `time.ParseDuration`:
+  `[-+]?(\d*(\.\d*)?(ns|us|µs|μs|ms|s|m|h))+`, or a bare `0`. The optional sign applies to the **whole**
+  duration and may appear only at the front - `-1h30m` is legal, `1h-30m` is not (the second `-` is
+  swallowed into what should be the `h` unit and fails to match any unit name). A second token
+  (`@every 1h 30m`) is also `bad-interval`, not "two durations added together". There is no day or week
+  unit. Each unit term contributes `intPart * unitNs` plus, for a fractional part, `floor(float64(fraction)
+  * (unitNs / 10^digits))` - Go computes the fractional nanoseconds as a `float64` multiplication,
+  truncated, not as exact decimal arithmetic, and this is mirrored exactly (not simplified to an
+  equivalent-looking integer computation) because the two can disagree by a nanosecond near a rounding
+  boundary. Terms accumulate in order; the running total must stay **below 2^63 nanoseconds** (Go's
+  `int64` duration range) after every term or the whole thing is `bad-interval`. Once total nanoseconds
+  are known: a duration under 1 second is clamped **up** to 1 second, then the result is truncated
+  **down** to whole seconds (`@every 1500ms` -> 1s, not 2s; `@every -1h` -> 1s, since a negative delay is
+  also clamped up). **Spans:** `@every` with no duration, or with more than one token, is `bad-interval`
+  spanning the **whole trimmed input**; a single token `time.ParseDuration` cannot read is `bad-interval`
+  spanning **just that token**. DERIVATION K7.
+- **`aws-rate`** (`rate(value unit)`, AWS EventBridge) - `rate(`, optional whitespace, `value`, **one
+  or more whitespace characters**, `unit`, optional whitespace, `)`. Whitespace inside the parens is
+  tolerant on both sides: `rate( 5  minutes )` is accepted, and `raw` keeps that spacing exactly as
+  typed (it is not renormalised to `rate(5 minutes)`). `value` is a run of 1-15 digits read as an
   integer, `unit` one of `minute`/`minutes`, `hour`/`hours`, `day`/`days`, **singular exactly when
   `value` is `1`** and plural otherwise (`rate(1 hours)` and `rate(5 hour)` are both `bad-interval`).
   `seconds = value * unitSeconds`; a result that is not a JavaScript safe integer (overflow), that is
-  `0`, a missing or malformed value/unit, or an unclosed `rate(...)`, is `bad-interval` (or
-  `bad-wrapper` when the final `)` is missing). DERIVATION A9.
+  `0`, or a missing or malformed value/unit, is `bad-interval` **spanning the interior** -
+  `[start + 5, end - 1)`, the text strictly between `rate(` and the final `)` - not the whole
+  expression. A missing final `)` is `bad-wrapper` spanning the **whole trimmed input** instead.
+  DERIVATION A9.
 
 ## `matches`
 
-`matches(schedule, instant)` is **true exactly when `next` would emit that instant** - nothing more.
-It is not a wall-clock field test. Three consequences a port must reproduce:
+`matches(schedule, instant, opts?)` is **true exactly when `next` would emit that instant** - nothing
+more. `opts.anchor` is required for an interval schedule (see the interval bullet under Run-time
+semantics below); a calendar schedule ignores it. It is not a wall-clock field test. Three consequences
+a port must reproduce:
 
 - A second-pass instant under `vixie-window` with a fixed-time schedule does **not** match, though its
   wall time matches every field.
@@ -277,8 +297,9 @@ attempted.
    matches that interval strategy's own claim test (`go-duration`: starts with `@every` followed by
    whitespace or end-of-string; `aws-rate`: starts with `rate(`), the whole input is read as an
    interval. `family` and `wrapper` are never tried: a malformed interval is always `bad-interval` (or
-   `bad-wrapper` for `aws-rate` missing its closing `)`), never a field error. On success `Schedule`
-   has empty `fields` and a `Schedule.interval`.
+   `bad-wrapper` for `aws-rate` missing its closing `)`), never a field error - see the exact spans each
+   failure reports under `go-duration`/`aws-rate` in Strategies above. On success `Schedule` has empty
+   `fields` and a `Schedule.interval`.
 2. **Wrapper.** Otherwise, if `wrapper` is not `null` and the trimmed input starts with `wrapper + "("`,
    the input must close with exactly one final `)` and contain no other `(` or `)` inside; anything
    else is `bad-wrapper`, spanning the whole trimmed input. On success the wrapper keyword and its two
@@ -340,13 +361,14 @@ null.
   an interval schedule, the same as for a no-schedule macro (`@reboot`).
 
 `expectSummary` is a **partial** expectation, for a case where the whole `Schedule` would be noise.
-`dialect` is always compared. `candidates` and `unsupported` are compared **exactly** whenever named in
-the case - and naming either means its absence in the parsed result must be absence (or emptiness)
-there too, not "don't care"; omitting the key from `expectSummary` altogether is what skips the check.
-`values` and `star` compare only the field names they list, by exact value, ignoring every other field
-the schedule has. `interval` is compared exactly as `{ seconds }`; naming it with no `interval` present
-on the parsed `Schedule` fails, and so does the reverse - an `expectSummary` that omits `interval`
-requires `Schedule.interval` to be **absent**.
+`dialect` is always compared. `candidates`, `unsupported` and `interval` are compared **exactly**, in
+**both** directions: naming one requires that exact value on the parsed `Schedule`, and **omitting one
+requires it to be absent (or empty) there** - omission is an assertion, not a "don't care". `interval`
+follows the same rule as the other two: it is compared as `{ seconds }`, and an `expectSummary` that
+omits it requires `Schedule.interval` to be absent. Only `values` and `star` are genuinely opt-in: they
+compare only the field names they list, by exact value, ignoring every other field the schedule has -
+`detect-question-mark-position-separates-quartz-from-aws` (`corpus/cases/parse/aws.json`) relies on the
+`candidates` rule the other way: its whole point is that *no* `candidates` came back.
 
 `expectError` is `{ "code", "span" }`. The codes are a closed list: `empty`, `field-count`,
 `bad-token`, `out-of-range`, `bad-step`, `bad-range`, `unknown-macro`, `unknown-dialect`,
@@ -424,8 +446,9 @@ a partial view of its window; no case currently needs it.
 ### The derived checks a runner must perform
 
 A `next` case is not only a `next` assertion. For each case, after asserting that
-`next(schedule, {from, count, until})` deep-equals `expect`, and that every `notMatching` instant does
-not match, a runner must also - unless `skipDerived` is set or `expect` is empty - check:
+`next(schedule, {from, count, until, anchor?})` deep-equals `expect` (`anchor` passed only when the case
+sets one, same as any other optional key), and that every `notMatching` instant does not match, a
+runner must also - unless `skipDerived` is set or `expect` is empty - check:
 
 Every derived check below passes `anchor: (case.anchor ?? case.from)` explicitly, because `matches` has
 no `from` of its own to default an omitted anchor to the way `next`/`prev` do; `notMatching` checks pass
