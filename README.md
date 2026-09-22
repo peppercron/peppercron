@@ -1,5 +1,8 @@
 # peppercron
 
+[![ci](https://github.com/peppercron/peppercron/actions/workflows/ci.yml/badge.svg)](https://github.com/peppercron/peppercron/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/peppercron.svg)](https://www.npmjs.com/package/peppercron)
+
 Parse cron schedules in five common dialects — vixie, Kubernetes, GitHub Actions, Quartz and AWS —
 and compute when they run, correctly across timezones and DST.
 

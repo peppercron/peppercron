@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "description": "Parse cron schedules in five common dialects (vixie, Kubernetes, GitHub Actions, Quartz, AWS) and compute run times correctly across timezones and DST.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peppercron/peppercron.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/peppercron/peppercron#readme",
+  "bugs": {
+    "url": "https://github.com/peppercron/peppercron/issues"
+  },
   "keywords": [
     "cron",
     "crontab",
