@@ -1,7 +1,7 @@
 # peppercron
 
-Parse cron schedules in every common dialect and compute when they run — correctly, across timezones
-and DST.
+Parse cron schedules in five common dialects — vixie, Kubernetes, GitHub Actions, Quartz and AWS —
+and compute when they run, correctly across timezones and DST.
 
 ```sh
 npm install peppercron
