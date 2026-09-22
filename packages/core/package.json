@@ -1,8 +1,28 @@
 {
   "name": "@peppercron/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Parse cron schedules in every common dialect and compute run times correctly across timezones and DST.",
   "license": "MIT",
+  "keywords": [
+    "cron",
+    "crontab",
+    "cron-parser",
+    "cron-expression",
+    "schedule",
+    "scheduler",
+    "next-run",
+    "timezone",
+    "dst",
+    "quartz",
+    "kubernetes",
+    "cronjob",
+    "github-actions",
+    "aws",
+    "eventbridge"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -31,7 +51,8 @@
     "typecheck": "tsc --noEmit",
     "prebuild": "npm run gen",
     "build": "tsup",
-    "size": "node scripts/size.mjs"
+    "size": "node scripts/size.mjs",
+    "prepublishOnly": "npm run build && npm run size"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
