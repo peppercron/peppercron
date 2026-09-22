@@ -2,7 +2,7 @@
 
 This directory is the source of truth for what a cron dialect *means*. It is plain JSON plus
 `DERIVATION.md`, with no dependency on the TypeScript implementation: a port in another language
-should be able to reproduce `@peppercron/core` exactly from this directory alone, and prove it by
+should be able to reproduce `peppercron` exactly from this directory alone, and prove it by
 running the cases.
 
 If a behaviour is not pinned by a case here, it is not a behaviour of the library. A change to

@@ -1,6 +1,6 @@
 # Derivation notes
 
-How the Vixie and Quartz behaviours that `@peppercron/core` reproduces were established.
+How the Vixie and Quartz behaviours that `peppercron` reproduces were established.
 Corpus cases with `provenance.source` pointing at this file cite the section below by its
 `H` number.
 

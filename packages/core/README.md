@@ -1,4 +1,4 @@
-# @peppercron/core
+# peppercron
 
 Parse cron schedules and compute when they run, correctly across timezones and DST.
 
@@ -21,7 +21,7 @@ Five dialects are supported. `describe`, `lint` and `convert` are planned.
 ## Install
 
 ```sh
-npm install @peppercron/core
+npm install peppercron
 ```
 
 The package ships ESM and CommonJS builds with type declarations. It needs a runtime with `Intl.DateTimeFormat` timezone support, which every current browser and Node version has.
@@ -29,7 +29,7 @@ The package ships ESM and CommonJS builds with type declarations. It needs a run
 ## Parse
 
 ```ts
-import { parse } from '@peppercron/core';
+import { parse } from 'peppercron';
 
 const r = parse('0 9 * * MON-FRI', { timezone: 'Europe/London' });
 if (r.ok) {
@@ -76,7 +76,7 @@ Spans are `[start, end)` offsets into the untouched input string, in UTF-16 code
 ## Run times
 
 ```ts
-import { parse, next, prev, matches } from '@peppercron/core';
+import { parse, next, prev, matches } from 'peppercron';
 
 const s = parse('0 9 * * MON-FRI', { timezone: 'Europe/London' });
 if (s.ok) {
@@ -110,7 +110,7 @@ Each run is `{ at, local, dst?, scheduled? }`: the instant, the wall time in the
 Kubernetes CronJobs and AWS EventBridge also accept an interval form - "every N seconds", not a calendar expression - as their whole schedule text instead of five fields:
 
 ```ts
-import { parse, next, matches } from '@peppercron/core';
+import { parse, next, matches } from 'peppercron';
 
 parse('@every 1h30m', { dialect: 'kubernetes' });
 // r.value.interval: { seconds: 5400, raw: '@every 1h30m', span: [0, 12] }, r.value.fields: []
@@ -191,7 +191,7 @@ The exact rules, and the source code and documentation they were derived from, a
 The default build reads timezone data from `Intl`. To supply your own (for tests, or a runtime without `Intl` zones), implement the small `Tz` interface and call `createCore`:
 
 ```ts
-import { createCore, type Tz } from '@peppercron/core';
+import { createCore, type Tz } from 'peppercron';
 
 const tz: Tz = {
   isValid: (zone) => zone === 'UTC',

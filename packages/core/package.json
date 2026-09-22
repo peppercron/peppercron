@@ -1,5 +1,5 @@
 {
-  "name": "@peppercron/core",
+  "name": "peppercron",
   "version": "0.1.0",
   "description": "Parse cron schedules in every common dialect and compute run times correctly across timezones and DST.",
   "license": "MIT",
@@ -20,9 +20,6 @@
     "aws",
     "eventbridge"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
