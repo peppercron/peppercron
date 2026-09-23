@@ -49,6 +49,16 @@ jobs:
       - run: npm run build
       - run: npm run size -w peppercron
 
+      # NPM_TOKEN is a repository secret holding an npm granular access token
+      # with "Read and write" on all packages, created at
+      # npmjs.com -> Access Tokens, and stored at
+      # github.com/peppercron/peppercron/settings/secrets/actions.
+      #
+      # The name is this repository's own: npm never sees it, and GitHub
+      # secrets carry no description, so this comment is the only place that
+      # says what the token is for. Revoking it breaks releases and nothing
+      # else. If it has an expiry, the first release after that date fails
+      # here with a 401.
       - name: Publish to npm with provenance
         working-directory: packages/core
         run: npm publish --provenance --access public

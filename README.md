@@ -92,6 +92,16 @@ npm run size -w peppercron   # enforces the gzipped budget
 The corpus is regenerated into the build automatically; `packages/core/src/generated/` is derived,
 never edited by hand.
 
+## Releasing
+
+Tagging `vX.Y.Z` runs [`release.yml`](.github/workflows/release.yml), which refuses to publish
+unless the tag matches `packages/core/package.json`, then publishes to npm with provenance.
+
+It needs one repository secret, **`NPM_TOKEN`** — an npm granular access token with *Read and write*
+on all packages. Nothing in npm's or GitHub's interface explains what that token is for, so: it
+exists solely for that workflow, revoking it breaks releases and nothing else, and if it carries an
+expiry the first release afterwards fails with a 401.
+
 ## Licence
 
 MIT.
